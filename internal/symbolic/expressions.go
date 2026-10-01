@@ -1,7 +1,11 @@
 // Package symbolic содержит конкретные реализации символьных выражений
 package symbolic
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+	"symbolic-execution-course/internal/bslices"
+)
 
 // SymbolicExpression - базовый интерфейс для всех символьных выражений
 type SymbolicExpression interface {
@@ -12,7 +16,7 @@ type SymbolicExpression interface {
 	String() string
 
 	// Accept принимает visitor для обхода дерева выражений
-	Accept(visitor Visitor) interface{}
+	Accept(visitor Visitor) (interface{}, error)
 }
 
 // SymbolicVariable представляет символьную переменную
@@ -40,7 +44,7 @@ func (sv *SymbolicVariable) String() string {
 }
 
 // Accept реализует Visitor pattern
-func (sv *SymbolicVariable) Accept(visitor Visitor) interface{} {
+func (sv *SymbolicVariable) Accept(visitor Visitor) (interface{}, error) {
 	return visitor.VisitVariable(sv)
 }
 
@@ -65,7 +69,7 @@ func (ic *IntConstant) String() string {
 }
 
 // Accept реализует Visitor pattern
-func (ic *IntConstant) Accept(visitor Visitor) interface{} {
+func (ic *IntConstant) Accept(visitor Visitor) (interface{}, error) {
 	return visitor.VisitIntConstant(ic)
 }
 
@@ -90,7 +94,7 @@ func (bc *BoolConstant) String() string {
 }
 
 // Accept реализует Visitor pattern
-func (bc *BoolConstant) Accept(visitor Visitor) interface{} {
+func (bc *BoolConstant) Accept(visitor Visitor) (interface{}, error) {
 	return visitor.VisitBoolConstant(bc)
 }
 
@@ -107,7 +111,18 @@ type BinaryOperation struct {
 func NewBinaryOperation(left, right SymbolicExpression, op BinaryOperator) *BinaryOperation {
 	// TODO: Реализовать
 	// Создать новую бинарную операцию и проверить совместимость типов
-	panic("не реализовано")
+	lt, rt := left.Type(), right.Type()
+	switch op {
+	case ADD, SUB, MUL, DIV, MOD, LT, LE, GT, GE:
+		if lt != IntType || rt != IntType {
+			panic(fmt.Sprintf("type mismatch: %s %s %s", lt, op, rt))
+		}
+	case EQ, NE:
+		if lt != rt {
+			panic(fmt.Sprintf("type mismatch: %s %s %s", lt, op, rt))
+		}
+	}
+	return &BinaryOperation{left, right, op}
 }
 
 // Type возвращает результирующий тип операции
@@ -115,19 +130,43 @@ func (bo *BinaryOperation) Type() ExpressionType {
 	// TODO: Реализовать
 	// Определить результирующий тип на основе операции и типов операндов
 	// Например: int + int = int, int < int = bool
-	panic("не реализовано")
+	switch bo.Operator {
+	case ADD, SUB, MUL, DIV, MOD:
+		return IntType
+	case LT, LE, GT, GE:
+		return BoolType
+	case EQ, NE:
+		return bo.Left.Type()
+	}
+	panic("unuspported operator " + bo.Operator.String())
 }
 
 // String возвращает строковое представление операции
 func (bo *BinaryOperation) String() string {
 	// TODO: Реализовать
 	// Формат: "(left operator right)"
-	panic("не реализовано")
+	return fmt.Sprintf("(%s %s %s)", bo.Left, bo.Operator, bo.Right)
 }
 
 // Accept реализует Visitor pattern
-func (bo *BinaryOperation) Accept(visitor Visitor) interface{} {
+func (bo *BinaryOperation) Accept(visitor Visitor) (interface{}, error) {
 	return visitor.VisitBinaryOperation(bo)
+}
+
+type NegateOperation struct {
+	Operand SymbolicExpression
+}
+
+func (no *NegateOperation) Type() ExpressionType {
+	return no.Operand.Type()
+}
+
+func (no *NegateOperation) String() string {
+	return fmt.Sprintf("-%s", no.Operand)
+}
+
+func (no *NegateOperation) Accept(visitor Visitor) (interface{}, error) {
+	return visitor.VisitNegateOperation(no)
 }
 
 // LogicalOperation представляет логическую операцию
@@ -142,7 +181,12 @@ type LogicalOperation struct {
 func NewLogicalOperation(operands []SymbolicExpression, op LogicalOperator) *LogicalOperation {
 	// TODO: Реализовать
 	// Создать логическую операцию и проверить типы операндов
-	panic("не реализовано")
+	if !bslices.All(operands, func(op SymbolicExpression) bool {
+		return op.Type() == BoolType
+	}) {
+		panic("all operands must be of boolean type")
+	}
+	return &LogicalOperation{operands, op}
 }
 
 // Type возвращает тип логической операции (всегда bool)
@@ -156,11 +200,22 @@ func (lo *LogicalOperation) String() string {
 	// Для NOT: "!operand"
 	// Для AND/OR: "(operand1 && operand2 && ...)"
 	// Для IMPLIES: "(operand1 => operand2)"
-	panic("не реализовано")
+	switch lo.Operator {
+	case NOT:
+		return fmt.Sprintf("!%s", lo.Operands[0])
+	case AND:
+		return strings.Join(bslices.Map(lo.Operands, func(op SymbolicExpression) string { return op.String() }), " && ")
+	case OR:
+		return strings.Join(bslices.Map(lo.Operands, func(op SymbolicExpression) string { return op.String() }), " || ")
+	case IMPLIES:
+		return fmt.Sprintf("(%s => %s)", lo.Operands[0], lo.Operands[1])
+	default:
+		panic("unsupported logical operator " + lo.Operator.String())
+	}
 }
 
 // Accept реализует Visitor pattern
-func (lo *LogicalOperation) Accept(visitor Visitor) interface{} {
+func (lo *LogicalOperation) Accept(visitor Visitor) (interface{}, error) {
 	return visitor.VisitLogicalOperation(lo)
 }
 
@@ -242,18 +297,56 @@ func (op LogicalOperator) String() string {
 
 type Ref struct {
 	// TODO: Выбрать и написать внутреннее представление символьной ссылки
+	ID       int64
+	ExprType ExpressionType
 }
 
 func (ref *Ref) Type() ExpressionType {
-	panic("не реализовано")
+	return PtrT{Elem: ref.ExprType}
 }
 
 func (ref *Ref) String() string {
-	panic("не реализовано")
+	return fmt.Sprintf("ref(%d)", ref.ID)
 }
 
-func (ref *Ref) Accept(visitor Visitor) interface{} {
-	panic("не реализовано")
+func (ref *Ref) Accept(visitor Visitor) (interface{}, error) {
+	return visitor.VisitRef(ref)
+}
+
+type ArrayAccess struct {
+	Array SymbolicExpression
+	Index SymbolicExpression
+}
+
+func (aa *ArrayAccess) Type() ExpressionType {
+	return aa.Array.Type().(ArrayT).Elem
+}
+
+func (aa *ArrayAccess) String() string {
+	return fmt.Sprintf("%s[%s]", aa.Array, aa.Index)
+}
+
+func (aa *ArrayAccess) Accept(visitor Visitor) (interface{}, error) {
+	return visitor.VisitArrayAccess(aa)
+}
+
+type FunctionCall struct {
+	FunctionName string
+	Arguments    []SymbolicExpression
+	RetType      ExpressionType
+}
+
+func (fc *FunctionCall) Type() ExpressionType {
+	return fc.RetType
+}
+
+func (fc *FunctionCall) String() string {
+	args := bslices.Map(fc.Arguments, func(arg SymbolicExpression) string { return arg.String() })
+	return fmt.Sprintf("%s(%s)", fc.FunctionName, strings.Join(args, ", "))
+}
+
+func (fc *FunctionCall) Accept(visitor Visitor) (interface{}, error) {
+	return visitor.VisitFunctionCall(fc)
 }
 
 // TODO: Добавьте дополнительные типы выражений по необходимости:
