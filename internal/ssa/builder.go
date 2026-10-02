@@ -9,8 +9,6 @@ import (
 	"go/token"
 	"go/types"
 
-	ierrors "symbolic-execution-course/internal/errors"
-
 	"golang.org/x/tools/go/ssa"
 	"golang.org/x/tools/go/ssa/ssautil"
 )
@@ -40,7 +38,7 @@ func (b *Builder) ParseAndBuildSSA(source string, funcName string) (*ssa.Functio
 
 	f, err := parser.ParseFile(b.fset, "source.go", source, parser.AllErrors)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ierrors.ErrParseSource, err)
+		return nil, fmt.Errorf("%s: %w", "cannot parse source", err)
 	}
 	files := []*ast.File{f}
 	pkg := types.NewPackage(f.Name.Name, f.Name.Name)
@@ -48,11 +46,11 @@ func (b *Builder) ParseAndBuildSSA(source string, funcName string) (*ssa.Functio
 	hello, _, err := ssautil.BuildPackage(
 		config, b.fset, pkg, files, ssa.SanityCheckFunctions)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ierrors.ErrBuildSSA, err)
+		return nil, fmt.Errorf("%s: %w", "cannot build SSA", err)
 	}
 	var fun = hello.Func(funcName)
 	if fun == nil {
-		return nil, ierrors.NewFunctionNotFound(funcName)
+		return nil, fmt.Errorf("%s: %w", "function not found", err)
 	}
 	return fun, nil
 

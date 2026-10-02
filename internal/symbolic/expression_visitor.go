@@ -16,7 +16,10 @@ type ExpressionVisitor interface {
 
 // Visit применяет посетителя без ошибок к выражению и возвращает результат его метода.
 func Visit(visitor ExpressionVisitor, expr SymbolicExpression) interface{} {
-	result, _ := expr.Accept(expressionVisitorAdapter{visitor})
+	result, err := expr.Accept(expressionVisitorAdapter{visitor})
+	if err != nil {
+		panic(err)
+	}
 	return result
 }
 

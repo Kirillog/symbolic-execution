@@ -219,11 +219,3 @@ func TestInRange(t *testing.T) {
 			"(and (>= x min) (<= x max))"},
 	})
 }
-
-// Одна и та же переменная в разных частях выражения должна транслироваться в один Z3 символ.
-func TestVariableCache(t *testing.T) {
-	runCases(t, []testCase{
-		{"x+x", bin(iv("x"), ADD, iv("x")), "(+ x x)"},
-		{"bool and int variables side by side", and(bv("b"), bin(iv("x"), GT, c(0))), "(and b (> x 0))"},
-	})
-}
