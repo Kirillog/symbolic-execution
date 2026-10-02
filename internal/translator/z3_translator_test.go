@@ -27,9 +27,14 @@ type testCase struct {
 
 func runCases(t *testing.T, cases []testCase) {
 	t.Helper()
+	runCasesWith(t, NewIntTranslator, cases)
+}
+
+func runCasesWith(t *testing.T, newTranslator func() *Z3Translator, cases []testCase) {
+	t.Helper()
 	for _, tc := range cases {
 		ok := t.Run(tc.name, func(t *testing.T) {
-			tr := NewZ3Translator()
+			tr := newTranslator()
 			defer tr.Close()
 
 			got, err := tr.TranslateExpression(tc.expr)
@@ -147,9 +152,29 @@ func TestDivide(t *testing.T) {
 	})
 }
 
-// В SymbolicExpression нет битовых операторов (&, |, ^), поэтому bitwiseOps не выразима.
 func TestBitwiseOps(t *testing.T) {
-	t.Skip("bitwise operators (&, |, ^) are not supported by symbolic.BinaryOperator")
+	x, y := iv("x"), iv("y")
+	runCasesWith(t, NewBV64Translator, []testCase{
+		{"(x&y)|(x^y)", bin(bin(x, BAND, y), BOR, bin(x, XOR, y)), "(bvor (bvand x y) (bvxor x y))"},
+		{"^x == 1", bin(bin(x, XOR, c(-1)), EQ, c(1)),
+			"(not (distinct (bvxor x #xffffffffffffffff) #x0000000000000001))"},
+		{"(x^y) == 0", bin(bin(x, XOR, y), EQ, c(0)),
+			"(not (distinct (bvxor x y) #x0000000000000000))"},
+		{"(x|7) == 15", bin(bin(x, BOR, c(7)), EQ, c(15)),
+			"(not (distinct (bvor x #x0000000000000007) #x000000000000000f))"},
+		{"(x&(x-1)) == 0", bin(bin(x, BAND, bin(x, SUB, c(1))), EQ, c(0)),
+			"(not (distinct (bvand x (bvsub x #x0000000000000001)) #x0000000000000000))"},
+		{"x<<3", bin(x, SHL, c(3)), "(bvshl x #x0000000000000003)"},
+		{"x>>2", bin(x, SHR, c(2)), "(bvashr x #x0000000000000002)"},
+	})
+}
+
+func TestBitwiseOpsRejectedByIntTheory(t *testing.T) {
+	tr := NewIntTranslator()
+	defer tr.Close()
+	if _, err := tr.TranslateExpression(bin(iv("x"), BAND, iv("y"))); err == nil {
+		t.Fatal("expected an error for & in the int theory")
+	}
 }
 
 func TestUnaryOps(t *testing.T) {

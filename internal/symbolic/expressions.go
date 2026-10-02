@@ -16,7 +16,7 @@ type SymbolicExpression interface {
 	String() string
 
 	// Accept принимает visitor для обхода дерева выражений
-	Accept(visitor Visitor) (interface{}, error)
+	Accept(visitor ExpressionVisitorError) (interface{}, error)
 }
 
 // SymbolicVariable представляет символьную переменную
@@ -44,7 +44,7 @@ func (sv *SymbolicVariable) String() string {
 }
 
 // Accept реализует Visitor pattern
-func (sv *SymbolicVariable) Accept(visitor Visitor) (interface{}, error) {
+func (sv *SymbolicVariable) Accept(visitor ExpressionVisitorError) (interface{}, error) {
 	return visitor.VisitVariable(sv)
 }
 
@@ -69,7 +69,7 @@ func (ic *IntConstant) String() string {
 }
 
 // Accept реализует Visitor pattern
-func (ic *IntConstant) Accept(visitor Visitor) (interface{}, error) {
+func (ic *IntConstant) Accept(visitor ExpressionVisitorError) (interface{}, error) {
 	return visitor.VisitIntConstant(ic)
 }
 
@@ -94,7 +94,7 @@ func (bc *BoolConstant) String() string {
 }
 
 // Accept реализует Visitor pattern
-func (bc *BoolConstant) Accept(visitor Visitor) (interface{}, error) {
+func (bc *BoolConstant) Accept(visitor ExpressionVisitorError) (interface{}, error) {
 	return visitor.VisitBoolConstant(bc)
 }
 
@@ -133,10 +133,8 @@ func (bo *BinaryOperation) Type() ExpressionType {
 	switch bo.Operator {
 	case ADD, SUB, MUL, DIV, MOD, BAND, BOR, XOR, SHL, SHR:
 		return IntType
-	case LT, LE, GT, GE:
+	case LT, LE, GT, GE, EQ, NE:
 		return BoolType
-	case EQ, NE:
-		return bo.Left.Type()
 	}
 	panic("unuspported operator " + bo.Operator.String())
 }
@@ -149,7 +147,7 @@ func (bo *BinaryOperation) String() string {
 }
 
 // Accept реализует Visitor pattern
-func (bo *BinaryOperation) Accept(visitor Visitor) (interface{}, error) {
+func (bo *BinaryOperation) Accept(visitor ExpressionVisitorError) (interface{}, error) {
 	return visitor.VisitBinaryOperation(bo)
 }
 
@@ -165,7 +163,7 @@ func (no *NegateOperation) String() string {
 	return fmt.Sprintf("-%s", no.Operand)
 }
 
-func (no *NegateOperation) Accept(visitor Visitor) (interface{}, error) {
+func (no *NegateOperation) Accept(visitor ExpressionVisitorError) (interface{}, error) {
 	return visitor.VisitNegateOperation(no)
 }
 
@@ -215,7 +213,7 @@ func (lo *LogicalOperation) String() string {
 }
 
 // Accept реализует Visitor pattern
-func (lo *LogicalOperation) Accept(visitor Visitor) (interface{}, error) {
+func (lo *LogicalOperation) Accept(visitor ExpressionVisitorError) (interface{}, error) {
 	return visitor.VisitLogicalOperation(lo)
 }
 
@@ -325,7 +323,7 @@ func (ref *Ref) String() string {
 	return fmt.Sprintf("ref(%d)", ref.ID)
 }
 
-func (ref *Ref) Accept(visitor Visitor) (interface{}, error) {
+func (ref *Ref) Accept(visitor ExpressionVisitorError) (interface{}, error) {
 	return visitor.VisitRef(ref)
 }
 
@@ -342,7 +340,7 @@ func (aa *ArrayAccess) String() string {
 	return fmt.Sprintf("%s[%s]", aa.Array, aa.Index)
 }
 
-func (aa *ArrayAccess) Accept(visitor Visitor) (interface{}, error) {
+func (aa *ArrayAccess) Accept(visitor ExpressionVisitorError) (interface{}, error) {
 	return visitor.VisitArrayAccess(aa)
 }
 
@@ -361,7 +359,7 @@ func (fc *FunctionCall) String() string {
 	return fmt.Sprintf("%s(%s)", fc.FunctionName, strings.Join(args, ", "))
 }
 
-func (fc *FunctionCall) Accept(visitor Visitor) (interface{}, error) {
+func (fc *FunctionCall) Accept(visitor ExpressionVisitorError) (interface{}, error) {
 	return visitor.VisitFunctionCall(fc)
 }
 

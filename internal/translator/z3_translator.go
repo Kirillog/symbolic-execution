@@ -14,10 +14,26 @@ type Z3Translator struct {
 	ctx    *z3.Context
 	config *z3.Config
 	vars   map[string]z3.Value // Кэш переменных
+	theory Theory
 }
 
-// NewZ3Translator создаёт новый экземпляр Z3 транслятора
+// NewZ3Translator создаёт новый экземпляр Z3 транслятора с теорией целых чисел
 func NewZ3Translator() *Z3Translator {
+	return NewIntTranslator()
+}
+
+// NewIntTranslator создаёт транслятор, отображающий int в z3.Int
+func NewIntTranslator() *Z3Translator {
+	return newZ3Translator(func(ctx *z3.Context) Theory { return NewIntTheory(ctx) })
+}
+
+// NewBV64Translator создаёт транслятор, отображающий int в 64-битный вектор
+func NewBV64Translator() *Z3Translator {
+	return newZ3Translator(func(ctx *z3.Context) Theory { return NewBV64Theory(ctx) })
+}
+
+// newZ3Translator создаёт транслятор; теория строится по созданному здесь Z3 контексту
+func newZ3Translator(newTheory func(*z3.Context) Theory) *Z3Translator {
 	config := &z3.Config{}
 	ctx := z3.NewContext(config)
 
@@ -25,6 +41,7 @@ func NewZ3Translator() *Z3Translator {
 		ctx:    ctx,
 		config: config,
 		vars:   make(map[string]z3.Value),
+		theory: newTheory(ctx),
 	}
 }
 
@@ -75,7 +92,7 @@ func (zt *Z3Translator) VisitVariable(expr *symbolic.SymbolicVariable) (interfac
 func (zt *Z3Translator) VisitIntConstant(expr *symbolic.IntConstant) (interface{}, error) {
 	// TODO: Реализовать
 	// Создать Z3 константу с помощью zt.ctx.FromBigInt или аналогичного метода
-	return zt.ctx.FromInt(expr.Value, zt.ctx.IntSort()), nil
+	return zt.theory.Const(expr.Value), nil
 }
 
 // VisitBoolConstant транслирует булеву константу в Z3
@@ -113,36 +130,19 @@ func (zt *Z3Translator) VisitBinaryOperation(expr *symbolic.BinaryOperation) (in
 		return distinct, nil
 	}
 
-	left, err := translateAs[z3.Int](zt, expr.Left)
+	left, err := translateAs[z3.Value](zt, expr.Left)
 	if err != nil {
 		return nil, err
 	}
-	right, err := translateAs[z3.Int](zt, expr.Right)
+	right, err := translateAs[z3.Value](zt, expr.Right)
 	if err != nil {
 		return nil, err
 	}
-	switch expr.Operator {
-	case symbolic.ADD:
-		return left.Add(right), nil
-	case symbolic.SUB:
-		return left.Sub(right), nil
-	case symbolic.DIV:
-		return left.Div(right), nil
-	case symbolic.MUL:
-		return left.Mul(right), nil
-	case symbolic.MOD:
-		return left.Mod(right), nil
-	case symbolic.LT:
-		return left.LT(right), nil
-	case symbolic.LE:
-		return left.LE(right), nil
-	case symbolic.GT:
-		return left.GT(right), nil
-	case symbolic.GE:
-		return left.GE(right), nil
-	default:
-		return nil, NewTranslationError(fmt.Sprintf("unsupported binary operator: %s", expr.Operator), expr)
+	res, err := zt.theory.Binary(expr.Operator, left, right)
+	if err != nil {
+		return nil, NewTranslationError(err.Error(), expr)
 	}
+	return res, nil
 }
 
 // VisitLogicalOperation транслирует логическую операцию в Z3
@@ -179,20 +179,20 @@ func (zt *Z3Translator) VisitLogicalOperation(expr *symbolic.LogicalOperation) (
 	}
 }
 
-// VisitArrayAccess implements [symbolic.Visitor].
+// VisitArrayAccess implements [symbolic.ExpressionVisitorError].
 func (zt *Z3Translator) VisitArrayAccess(expr *symbolic.ArrayAccess) (interface{}, error) {
 	array, err := translateAs[z3.Array](zt, expr.Array)
 	if err != nil {
 		return nil, err
 	}
-	index, err := translateAs[z3.Int](zt, expr.Index)
+	index, err := translateAs[z3.Value](zt, expr.Index)
 	if err != nil {
 		return nil, err
 	}
 	return array.Select(index), nil
 }
 
-// VisitFunctionCall implements [symbolic.Visitor].
+// VisitFunctionCall implements [symbolic.ExpressionVisitorError].
 func (zt *Z3Translator) VisitFunctionCall(expr *symbolic.FunctionCall) (interface{}, error) {
 	arguments, err := MapWithError(expr.Arguments, func(arg symbolic.SymbolicExpression) (z3.Value, error) {
 		return translateAs[z3.Value](zt, arg)
@@ -208,16 +208,20 @@ func (zt *Z3Translator) VisitFunctionCall(expr *symbolic.FunctionCall) (interfac
 	return decl.Apply(arguments...), nil
 }
 
-// VisitNegateOperation implements [symbolic.Visitor].
+// VisitNegateOperation implements [symbolic.ExpressionVisitorError].
 func (zt *Z3Translator) VisitNegateOperation(expr *symbolic.NegateOperation) (interface{}, error) {
-	val, err := translateAs[z3.Int](zt, expr.Operand)
+	val, err := translateAs[z3.Value](zt, expr.Operand)
 	if err != nil {
 		return nil, err
 	}
-	return val.Neg(), nil
+	res, err := zt.theory.Neg(val)
+	if err != nil {
+		return nil, NewTranslationError(err.Error(), expr)
+	}
+	return res, nil
 }
 
-// VisitRef implements [symbolic.Visitor].
+// VisitRef implements [symbolic.ExpressionVisitorError].
 func (zt *Z3Translator) VisitRef(expr *symbolic.Ref) (interface{}, error) {
 	return zt.ctx.FromInt(int64(expr.ID), zt.ctx.IntSort()), nil
 }
@@ -227,11 +231,11 @@ func (zt *Z3Translator) VisitRef(expr *symbolic.Ref) (interface{}, error) {
 func (zt *Z3Translator) sortOf(exprType symbolic.ExpressionType) z3.Sort {
 	switch exprType := exprType.(type) {
 	case symbolic.IntT:
-		return zt.ctx.IntSort()
+		return zt.theory.Sort()
 	case symbolic.BoolT:
 		return zt.ctx.BoolSort()
 	case symbolic.ArrayT:
-		return zt.ctx.ArraySort(zt.ctx.IntSort(), zt.sortOf(exprType.Elem))
+		return zt.ctx.ArraySort(zt.theory.Sort(), zt.sortOf(exprType.Elem))
 	case symbolic.PtrT:
 		return zt.ctx.IntSort()
 	default:

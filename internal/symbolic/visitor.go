@@ -1,7 +1,7 @@
 package symbolic
 
-// Visitor интерфейс для обхода символьных выражений (Visitor Pattern)
-type Visitor interface {
+// ExpressionVisitorError - посетитель, возвращающий значение или ошибку; интерфейс для обхода символьных выражений (Visitor Pattern)
+type ExpressionVisitorError interface {
 	VisitVariable(expr *SymbolicVariable) (interface{}, error)
 	VisitIntConstant(expr *IntConstant) (interface{}, error)
 	VisitBoolConstant(expr *BoolConstant) (interface{}, error)
