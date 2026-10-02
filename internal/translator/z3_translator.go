@@ -3,7 +3,7 @@ package translator
 
 import (
 	"fmt"
-	"symbolic-execution-course/internal/bslices"
+	. "symbolic-execution-course/internal/bslices"
 	"symbolic-execution-course/internal/symbolic"
 
 	"github.com/ebukreev/go-z3/z3"
@@ -157,7 +157,7 @@ func (zt *Z3Translator) VisitLogicalOperation(expr *symbolic.LogicalOperation) (
 	// - NOT: operand.Not() (для единственного операнда)
 	// - IMPLIES: antecedent.Implies(consequent)
 
-	operands, err := bslices.MapWithError(expr.Operands,
+	operands, err := MapWithError(expr.Operands,
 		func(operand symbolic.SymbolicExpression) (z3.Bool, error) {
 			return translateAs[z3.Bool](zt, operand)
 		})
@@ -194,14 +194,14 @@ func (zt *Z3Translator) VisitArrayAccess(expr *symbolic.ArrayAccess) (interface{
 
 // VisitFunctionCall implements [symbolic.Visitor].
 func (zt *Z3Translator) VisitFunctionCall(expr *symbolic.FunctionCall) (interface{}, error) {
-	arguments, err := bslices.MapWithError(expr.Arguments, func(arg symbolic.SymbolicExpression) (z3.Value, error) {
+	arguments, err := MapWithError(expr.Arguments, func(arg symbolic.SymbolicExpression) (z3.Value, error) {
 		return translateAs[z3.Value](zt, arg)
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	domain := bslices.Map(expr.Arguments, func(arg symbolic.SymbolicExpression) z3.Sort {
+	domain := Map(expr.Arguments, func(arg symbolic.SymbolicExpression) z3.Sort {
 		return zt.sortOf(arg.Type())
 	})
 	decl := zt.ctx.FuncDecl(expr.FunctionName, domain, zt.sortOf(expr.RetType))

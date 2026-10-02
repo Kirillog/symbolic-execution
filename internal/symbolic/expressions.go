@@ -113,7 +113,7 @@ func NewBinaryOperation(left, right SymbolicExpression, op BinaryOperator) *Bina
 	// Создать новую бинарную операцию и проверить совместимость типов
 	lt, rt := left.Type(), right.Type()
 	switch op {
-	case ADD, SUB, MUL, DIV, MOD, LT, LE, GT, GE:
+	case ADD, SUB, MUL, DIV, MOD, LT, LE, GT, GE, BAND, BOR, XOR, SHL, SHR:
 		if lt != IntType || rt != IntType {
 			panic(fmt.Sprintf("type mismatch: %s %s %s", lt, op, rt))
 		}
@@ -131,7 +131,7 @@ func (bo *BinaryOperation) Type() ExpressionType {
 	// Определить результирующий тип на основе операции и типов операндов
 	// Например: int + int = int, int < int = bool
 	switch bo.Operator {
-	case ADD, SUB, MUL, DIV, MOD:
+	case ADD, SUB, MUL, DIV, MOD, BAND, BOR, XOR, SHL, SHR:
 		return IntType
 	case LT, LE, GT, GE:
 		return BoolType
@@ -237,6 +237,12 @@ const (
 	LE // меньше или равно
 	GT // больше
 	GE // больше или равно
+
+	BAND
+	BOR
+	XOR
+	SHL
+	SHR
 )
 
 // String возвращает строковое представление оператора
@@ -264,6 +270,16 @@ func (op BinaryOperator) String() string {
 		return ">"
 	case GE:
 		return ">="
+	case BAND:
+		return "&&"
+	case BOR:
+		return "||"
+	case XOR:
+		return "^"
+	case SHL:
+		return "<<"
+	case SHR:
+		return ">>"
 	default:
 		return "unknown"
 	}
