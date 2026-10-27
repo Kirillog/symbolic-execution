@@ -19,6 +19,7 @@ type Analyser struct {
 }
 
 const maxSteps = 10000
+const maxBlockVisits = 50
 
 func Analyse(source string, functionName string) []Interpreter {
 	builder := ssa.NewBuilder()
@@ -37,11 +38,11 @@ func Analyse(source string, functionName string) []Interpreter {
 
 	for step := 0; step < maxSteps && analyser.StatesQueue.Len() > 0; step++ {
 		state := heap.Pop(&analyser.StatesQueue).(*Item).value
-		if !analyser.isSatisfiable(state.PathCondition) {
+		frame := state.CallStack[len(state.CallStack)-1]
+		if frame.BlockVisits[frame.Block] > maxBlockVisits || !analyser.isSatisfiable(state.PathCondition) {
 			continue
 		}
 
-		frame := state.CallStack[len(state.CallStack)-1]
 		if frame.Block == nil {
 			analyser.Results = append(analyser.Results, state)
 			continue
@@ -72,6 +73,7 @@ func newInterpreter(analyser *Analyser) Interpreter {
 			Function:    analyser.Function,
 			LocalMemory: locals,
 			Block:       analyser.Function.Blocks[0],
+			BlockVisits: make(map[*xssa.BasicBlock]int),
 		}},
 		Analyser:      analyser,
 		PathCondition: symbolic.NewBoolConstant(true),

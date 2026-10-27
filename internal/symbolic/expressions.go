@@ -269,9 +269,9 @@ func (op BinaryOperator) String() string {
 	case GE:
 		return ">="
 	case BAND:
-		return "&&"
+		return "&"
 	case BOR:
-		return "||"
+		return "|"
 	case XOR:
 		return "^"
 	case SHL:

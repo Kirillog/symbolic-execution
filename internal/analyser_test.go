@@ -98,6 +98,22 @@ func TestAnalyse(t *testing.T) {
 			},
 		},
 		{
+			// не проходит: BAND и BOR печатаются как && и ||
+			name: "testBitwise",
+			want: []string{
+				"true && (((a & b) | (a | b)) > 0) => ((a ^ b) << 1)",
+				"true && !(((a & b) | (a | b)) > 0) => ((a ^ b) >> 1)",
+			},
+		},
+		{
+			// не проходит: унарный ^ не поддержан, ^y трактуется как y ^ -1
+			name: "testUnary",
+			want: []string{
+				"true && ((-x ^ -1) > 0) => (-x ^ -1)",
+				"true && !((-x ^ -1) > 0) => -x",
+			},
+		},
+		{
 			name: "pruned",
 			source: `package main
 func pruned(x int) int {
@@ -157,6 +173,12 @@ func loop(n int) int {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("Analyse(%s) panicked: %v", tc.name, r)
+				}
+			}()
+
 			source := tc.source
 			if source == "" {
 				source = string(examples)
@@ -173,6 +195,35 @@ func loop(n int) int {
 			slices.Sort(want)
 			if !slices.Equal(got, want) {
 				t.Fatalf("paths of %s:\n got:  %q\n want: %q", tc.name, got, want)
+			}
+		})
+	}
+}
+
+// TestAnalyseLoops проверяет только число путей: каждая итерация цикла даёт свой путь,
+// а число итераций ограничено maxBlockVisits.
+func TestAnalyseLoops(t *testing.T) {
+	examples, err := os.ReadFile(examplesPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		name string
+		want int
+	}{
+		{"testWhileLoop", maxBlockVisits},
+		{"testForLoop", maxBlockVisits},
+		{"testInfiniteLoopBreak", maxBlockVisits},
+		// условие i%2 == 0 при конкретном i выполнимо только с одной стороны,
+		// остаётся ветвление по condition
+		{"testLoopWithConcreteBoundAndSymbolicBranching", 2},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := len(Analyse(string(examples), tc.name)); got != tc.want {
+				t.Fatalf("paths of %s: got %d, want %d", tc.name, got, tc.want)
 			}
 		})
 	}

@@ -28,6 +28,15 @@ type CallStackFrame struct {
 	Block     *ssa.BasicBlock
 	PrevBlock *ssa.BasicBlock
 	InstrIdx  int
+
+	BlockVisits map[*ssa.BasicBlock]int
+}
+
+func (frame *CallStackFrame) enter(block *ssa.BasicBlock) {
+	frame.PrevBlock = frame.Block
+	frame.Block = block
+	frame.InstrIdx = 0
+	frame.BlockVisits[block]++
 }
 
 func (interpreter Interpreter) Clone() Interpreter {
@@ -35,6 +44,7 @@ func (interpreter Interpreter) Clone() Interpreter {
 	clone.CallStack = make([]CallStackFrame, len(interpreter.CallStack))
 	for i, frame := range interpreter.CallStack {
 		frame.LocalMemory = maps.Clone(frame.LocalMemory)
+		frame.BlockVisits = maps.Clone(frame.BlockVisits)
 		clone.CallStack[i] = frame
 	}
 	return clone
@@ -96,9 +106,7 @@ func (interpreter *Interpreter) interpretDynamically(element ssa.Instruction) []
 			panic(fmt.Sprintf("unsupported unary operator %s", instr.Op))
 		}
 	case *ssa.Jump:
-		frame.PrevBlock = frame.Block
-		frame.Block = frame.Block.Succs[0]
-		frame.InstrIdx = 0
+		frame.enter(frame.Block.Succs[0])
 	case *ssa.Phi:
 		// все phi блока выполняются одновременно: сначала читаем значения, потом пишем,
 		// иначе phi, читающий другой phi того же блока, увидит уже новое значение
@@ -148,9 +156,7 @@ func (interpreter *Interpreter) interpretDynamically(element ssa.Instruction) []
 func (interpreter *Interpreter) branch(condition symbolic.SymbolicExpression, target *ssa.BasicBlock) Interpreter {
 	clone := interpreter.Clone()
 	frame := &clone.CallStack[len(clone.CallStack)-1]
-	frame.PrevBlock = frame.Block
-	frame.Block = target
-	frame.InstrIdx = 0
+	frame.enter(target)
 	clone.PathCondition = symbolic.NewLogicalOperation(
 		[]symbolic.SymbolicExpression{interpreter.PathCondition, condition}, symbolic.AND)
 	return clone
