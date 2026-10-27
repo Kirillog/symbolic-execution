@@ -12,6 +12,8 @@ type expr = SymbolicExpression
 func iv(name string) expr { return NewSymbolicVariable(name, IntType) }
 func bv(name string) expr { return NewSymbolicVariable(name, BoolType) }
 func c(n int64) expr      { return NewIntConstant(n) }
+func fv(name string) expr { return NewSymbolicVariable(name, FloatType) }
+func fc(x float64) expr   { return NewFloatConstant(x) }
 
 func bin(l expr, op BinaryOperator, r expr) expr { return NewBinaryOperation(l, r, op) }
 func and(xs ...expr) expr                        { return NewLogicalOperation(xs, AND) }
@@ -128,26 +130,26 @@ func TestModOperations(t *testing.T) {
 				bin(bin(iv("x"), MOD, c(2)), EQ, c(0)),
 				bin(bin(iv("y"), MOD, c(3)), EQ, c(1)),
 			),
-			"(and (not (distinct (mod x 2) 0)) (not (distinct (mod y 3) 1)))"},
+			"(and (= (mod x 2) 0) (= (mod y 3) 1))"},
 	})
 }
 
 func TestCompareAll(t *testing.T) {
 	a, b, cc := iv("a"), iv("b"), iv("c")
 	runCases(t, []testCase{
-		{"a==b alone", bin(a, EQ, b), "(not (distinct a b))"},
-		{"b!=c alone", bin(b, NE, cc), "(distinct b c)"},
+		{"a==b alone", bin(a, EQ, b), "(= a b)"},
+		{"b!=c alone", bin(b, NE, cc), "(not (= b c))"},
 		{"a==b || b!=c || a<c || c>=b",
 			or(bin(a, EQ, b), bin(b, NE, cc), bin(a, LT, cc), bin(cc, GE, b)),
-			"(or (not (distinct a b)) (distinct b c) (< a c) (>= c b))"},
+			"(or (= a b) (not (= b c)) (< a c) (>= c b))"},
 	})
 }
 
 func TestDivide(t *testing.T) {
 	nz := bin(iv("y"), NE, c(0))
 	runCases(t, []testCase{
-		{"guard: y!=0", nz, "(distinct y 0)"},
-		{"guard else: !(y!=0)", not(nz), "(not (distinct y 0))"},
+		{"guard: y!=0", nz, "(not (= y 0))"},
+		{"guard else: !(y!=0)", not(nz), "(not (not (= y 0)))"},
 		{"return x/y", bin(iv("x"), DIV, iv("y")), "(div x y)"},
 	})
 }
@@ -157,13 +159,13 @@ func TestBitwiseOps(t *testing.T) {
 	runCasesWith(t, NewBV64Translator, []testCase{
 		{"(x&y)|(x^y)", bin(bin(x, BAND, y), BOR, bin(x, XOR, y)), "(bvor (bvand x y) (bvxor x y))"},
 		{"^x == 1", bin(bin(x, XOR, c(-1)), EQ, c(1)),
-			"(not (distinct (bvxor x #xffffffffffffffff) #x0000000000000001))"},
+			"(= (bvxor x #xffffffffffffffff) #x0000000000000001)"},
 		{"(x^y) == 0", bin(bin(x, XOR, y), EQ, c(0)),
-			"(not (distinct (bvxor x y) #x0000000000000000))"},
+			"(= (bvxor x y) #x0000000000000000)"},
 		{"(x|7) == 15", bin(bin(x, BOR, c(7)), EQ, c(15)),
-			"(not (distinct (bvor x #x0000000000000007) #x000000000000000f))"},
+			"(= (bvor x #x0000000000000007) #x000000000000000f)"},
 		{"(x&(x-1)) == 0", bin(bin(x, BAND, bin(x, SUB, c(1))), EQ, c(0)),
-			"(not (distinct (bvand x (bvsub x #x0000000000000001)) #x0000000000000000))"},
+			"(= (bvand x (bvsub x #x0000000000000001)) #x0000000000000000)"},
 		{"x<<3", bin(x, SHL, c(3)), "(bvshl x #x0000000000000003)"},
 		{"x>>2", bin(x, SHR, c(2)), "(bvashr x #x0000000000000002)"},
 	})
@@ -219,3 +221,29 @@ func TestInRange(t *testing.T) {
 			"(and (>= x min) (<= x max))"},
 	})
 }
+
+func TestFloat64(t *testing.T) {
+	a, b := fv("a"), fv("b")
+	runCases(t, []testCase{
+		{"2.0", fc(2), "(fp #b0 #b10000000000 #x0000000000000)"},
+		{"10.1", fc(10.1), "(fp #b0 #b10000000010 #x4333333333333)"},
+		{"11.125", fc(11.125), "(fp #b0 #b10000000010 #x6400000000000)"},
+		{"a+1.1", bin(a, ADD, fc(1.1)),
+			"(fp.add roundNearestTiesToEven a (fp #b0 #b01111111111 #x199999999999a))"},
+		{"a-b", bin(a, SUB, b), "(fp.sub roundNearestTiesToEven a b)"},
+		{"a*b", bin(a, MUL, b), "(fp.mul roundNearestTiesToEven a b)"},
+		{"a/b", bin(a, DIV, b), "(fp.div roundNearestTiesToEven a b)"},
+		{"-a", neg(a), "(fp.neg a)"},
+		{"a<b", bin(a, LT, b), "(fp.lt a b)"},
+		{"a>=b", bin(a, GE, b), "(fp.geq a b)"},
+	})
+}
+
+func TestFloat64Equality(t *testing.T) {
+	a, b := fv("a"), fv("b")
+	runCases(t, []testCase{
+		{"a==b", bin(a, EQ, b), "(fp.eq a b)"},
+		{"a!=b", bin(a, NE, b), "(not (fp.eq a b))"},
+	})
+}
+

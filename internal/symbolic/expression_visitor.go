@@ -5,6 +5,7 @@ package symbolic
 type ExpressionVisitor interface {
 	VisitVariable(expr *SymbolicVariable) interface{}
 	VisitIntConstant(expr *IntConstant) interface{}
+	VisitFloatConstant(expr *FloatConstant) interface{}
 	VisitBoolConstant(expr *BoolConstant) interface{}
 	VisitNegateOperation(expr *NegateOperation) interface{}
 	VisitBinaryOperation(expr *BinaryOperation) interface{}
@@ -34,6 +35,10 @@ func (a expressionVisitorAdapter) VisitVariable(expr *SymbolicVariable) (interfa
 
 func (a expressionVisitorAdapter) VisitIntConstant(expr *IntConstant) (interface{}, error) {
 	return a.visitor.VisitIntConstant(expr), nil
+}
+
+func (a expressionVisitorAdapter) VisitFloatConstant(expr *FloatConstant) (interface{}, error) {
+	return a.visitor.VisitFloatConstant(expr), nil
 }
 
 func (a expressionVisitorAdapter) VisitBoolConstant(expr *BoolConstant) (interface{}, error) {

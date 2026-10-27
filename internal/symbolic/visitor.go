@@ -4,6 +4,7 @@ package symbolic
 type ExpressionVisitorError interface {
 	VisitVariable(expr *SymbolicVariable) (interface{}, error)
 	VisitIntConstant(expr *IntConstant) (interface{}, error)
+	VisitFloatConstant(expr *FloatConstant) (interface{}, error)
 	VisitBoolConstant(expr *BoolConstant) (interface{}, error)
 	VisitNegateOperation(expr *NegateOperation) (interface{}, error)
 	VisitBinaryOperation(expr *BinaryOperation) (interface{}, error)
