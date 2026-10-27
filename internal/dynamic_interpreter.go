@@ -18,6 +18,11 @@ type Interpreter struct {
 	Analyser      *Analyser
 	PathCondition symbolic.SymbolicExpression
 	Heap          memory.Memory
+	Panic         *PanicInfo
+}
+
+type PanicInfo struct {
+	Message string
 }
 
 type CallStackFrame struct {
@@ -95,8 +100,18 @@ func (interpreter *Interpreter) interpretDynamically(element ssa.Instruction) []
 		if !ok {
 			panic(fmt.Sprintf("unsupported binary operator %s", instr.Op))
 		}
-		frame.LocalMemory[instr.Name()] = symbolic.NewBinaryOperation(
-			interpreter.resolveExpression(instr.X), interpreter.resolveExpression(instr.Y), op)
+		left, right := interpreter.resolveExpression(instr.X), interpreter.resolveExpression(instr.Y)
+		frame.LocalMemory[instr.Name()] = symbolic.NewBinaryOperation(left, right, op)
+
+		if (op == symbolic.DIV || op == symbolic.MOD) && right.Type() == symbolic.IntType && !isNonZeroConstant(right) {
+			isZero := symbolic.NewBinaryOperation(right, symbolic.NewIntConstant(0), symbolic.EQ)
+			notZero := symbolic.NewLogicalOperation([]symbolic.SymbolicExpression{isZero}, symbolic.NOT)
+
+			panicked := interpreter.assume(isZero)
+			panicked.Panic = &PanicInfo{Message: "integer divide by zero"}
+			panicked.CallStack[len(panicked.CallStack)-1].Block = nil
+			return []Interpreter{interpreter.assume(notZero), panicked}
+		}
 	case *ssa.UnOp:
 		operand := interpreter.resolveExpression(instr.X)
 		switch instr.Op {
@@ -144,6 +159,10 @@ func (interpreter *Interpreter) interpretDynamically(element ssa.Instruction) []
 			panic("multiple return values are not supported")
 		}
 		frame.Block = nil
+	case *ssa.MakeInterface:
+	case *ssa.Panic:
+		interpreter.Panic = &PanicInfo{Message: panicMessage(instr.X)}
+		frame.Block = nil
 	case *ssa.If:
 		condition := interpreter.resolveExpression(instr.Cond)
 		negation := symbolic.NewLogicalOperation([]symbolic.SymbolicExpression{condition}, symbolic.NOT)
@@ -157,13 +176,34 @@ func (interpreter *Interpreter) interpretDynamically(element ssa.Instruction) []
 	return []Interpreter{*interpreter}
 }
 
-func (interpreter *Interpreter) branch(condition symbolic.SymbolicExpression, target *ssa.BasicBlock) Interpreter {
+func (interpreter *Interpreter) assume(condition symbolic.SymbolicExpression) Interpreter {
 	clone := interpreter.Clone()
-	frame := &clone.CallStack[len(clone.CallStack)-1]
-	frame.enter(target)
 	clone.PathCondition = symbolic.NewLogicalOperation(
 		[]symbolic.SymbolicExpression{interpreter.PathCondition, condition}, symbolic.AND)
 	return clone
+}
+
+func (interpreter *Interpreter) branch(condition symbolic.SymbolicExpression, target *ssa.BasicBlock) Interpreter {
+	clone := interpreter.assume(condition)
+	frame := &clone.CallStack[len(clone.CallStack)-1]
+	frame.enter(target)
+	return clone
+}
+
+func isNonZeroConstant(expr symbolic.SymbolicExpression) bool {
+	constant, ok := expr.(*symbolic.IntConstant)
+	return ok && constant.Value != 0
+}
+
+func panicMessage(value ssa.Value) string {
+	makeInterface, ok := value.(*ssa.MakeInterface)
+	if !ok {
+		return ""
+	}
+	if text, ok := makeInterface.X.(*ssa.Const); ok && text.Value != nil && text.Value.Kind() == constant.String {
+		return constant.StringVal(text.Value)
+	}
+	return ""
 }
 
 func (interpreter *Interpreter) resolveExpression(value ssa.Value) symbolic.SymbolicExpression {

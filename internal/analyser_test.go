@@ -120,6 +120,57 @@ func TestAnalyse(t *testing.T) {
 			},
 		},
 		{
+			name: "twoPanics",
+			source: `package main
+func twoPanics(x int) int {
+	if x > 10 {
+		panic("big")
+	}
+	if x < -10 {
+		panic("small")
+	}
+	return x
+}`,
+			want: []string{
+				"true && (x > 10) => panic: big",
+				"true && !(x > 10) && (x < -10) => panic: small",
+				"true && !(x > 10) && !(x < -10) => x",
+			},
+		},
+		{
+			name: "divide",
+			source: `package main
+func divide(x, y int) int {
+	return x / y
+}`,
+			want: []string{
+				"true && !(y == 0) => (x / y)",
+				"true && (y == 0) => panic: integer divide by zero",
+			},
+		},
+		{
+			name: "twoDivs",
+			source: `package main
+func twoDivs(x, y, z int) int {
+	return x/y + x/z
+}`,
+			want: []string{
+				"true && !(y == 0) && !(z == 0) => ((x / y) + (x / z))",
+				"true && !(y == 0) && (z == 0) => panic: integer divide by zero",
+				"true && (y == 0) => panic: integer divide by zero",
+			},
+		},
+		{
+			name: "floatDivide",
+			source: `package main
+func floatDivide(a, b float64) float64 {
+	return a / b
+}`,
+			want: []string{
+				"true => (a / b)",
+			},
+		},
+		{
 			name: "pruned",
 			source: `package main
 func pruned(x int) int {
@@ -192,8 +243,11 @@ func loop(n int) int {
 
 			var got []string
 			for _, result := range Analyse(source, tc.name) {
-				frame := result.CallStack[0]
-				got = append(got, fmt.Sprintf("%s => %s", result.PathCondition, frame.ReturnValue))
+				outcome := fmt.Sprint(result.CallStack[0].ReturnValue)
+				if result.Panic != nil {
+					outcome = "panic: " + result.Panic.Message
+				}
+				got = append(got, fmt.Sprintf("%s => %s", result.PathCondition, outcome))
 			}
 
 			want := slices.Clone(tc.want)
@@ -222,6 +276,7 @@ func TestAnalyseLoops(t *testing.T) {
 		{"testForLoop", maxBlockVisits},
 		{"testInfiniteLoopBreak", maxBlockVisits},
 		{"testLoopWithConcreteBoundAndSymbolicBranching", 2},
+		{"testLoopWithSymbolicBoundAndSymbolicBranching", 22},
 	}
 
 	for _, tc := range cases {
