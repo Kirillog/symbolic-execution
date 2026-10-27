@@ -16,6 +16,8 @@ type Z3Translator struct {
 	vars        map[string]z3.Value // Кэш переменных
 	theory      Theory
 	floatTheory FloatTheory
+
+	memo map[symbolic.SymbolicExpression]interface{}
 }
 
 // NewZ3Translator создаёт новый экземпляр Z3 транслятора с теорией целых чисел
@@ -44,6 +46,7 @@ func newZ3Translator(newTheory func(*z3.Context) Theory) *Z3Translator {
 		vars:        make(map[string]z3.Value),
 		theory:      newTheory(ctx),
 		floatTheory: NewFP64Theory(ctx),
+		memo:        make(map[symbolic.SymbolicExpression]interface{}),
 	}
 }
 
@@ -55,6 +58,7 @@ func (zt *Z3Translator) GetContext() interface{} {
 // Reset сбрасывает состояние транслятора
 func (zt *Z3Translator) Reset() {
 	zt.vars = make(map[string]z3.Value)
+	zt.memo = make(map[symbolic.SymbolicExpression]interface{})
 }
 
 // Close освобождает ресурсы
@@ -64,7 +68,18 @@ func (zt *Z3Translator) Close() {
 
 // TranslateExpression транслирует символьное выражение в Z3
 func (zt *Z3Translator) TranslateExpression(expr symbolic.SymbolicExpression) (interface{}, error) {
-	return expr.Accept(zt)
+	return zt.translate(expr)
+}
+
+func (zt *Z3Translator) translate(expr symbolic.SymbolicExpression) (interface{}, error) {
+	if cached, ok := zt.memo[expr]; ok {
+		return cached, nil
+	}
+	res, err := expr.Accept(zt)
+	if err == nil {
+		zt.memo[expr] = res
+	}
+	return res, err
 }
 
 // TODO: Реализуйте следующие методы в рамках домашнего задания
@@ -298,7 +313,7 @@ func castToZ3Type[T z3.Value](value interface{}) (T, error) {
 
 // translateAs транслирует выражение и приводит результат к Z3 типу T
 func translateAs[T z3.Value](zt *Z3Translator, expr symbolic.SymbolicExpression) (T, error) {
-	v, err := expr.Accept(zt)
+	v, err := zt.translate(expr)
 	if err != nil {
 		var zero T
 		return zero, err

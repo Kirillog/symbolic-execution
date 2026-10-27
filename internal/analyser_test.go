@@ -277,6 +277,7 @@ func TestAnalyseLoops(t *testing.T) {
 		{"testInfiniteLoopBreak", maxBlockVisits},
 		{"testLoopWithConcreteBoundAndSymbolicBranching", 2},
 		{"testLoopWithSymbolicBoundAndSymbolicBranching", 22},
+		{"testCombined", maxBlockVisits / 2},
 	}
 
 	for _, tc := range cases {
