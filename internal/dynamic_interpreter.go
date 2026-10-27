@@ -60,6 +60,8 @@ func symbolicType(tpe types.Type) symbolic.ExpressionType {
 		return symbolic.IntType
 	case basic.Info() & types.IsBoolean != 0:
 		return symbolic.BoolType
+	case basic.Info() & types.IsFloat != 0:
+		return symbolic.FloatType
 	}
 	panic(fmt.Sprintf("unsupported type %s", tpe))
 }
@@ -102,6 +104,8 @@ func (interpreter *Interpreter) interpretDynamically(element ssa.Instruction) []
 			frame.LocalMemory[instr.Name()] = &symbolic.NegateOperation{Operand: operand}
 		case token.NOT:
 			frame.LocalMemory[instr.Name()] = symbolic.NewLogicalOperation([]symbolic.SymbolicExpression{operand}, symbolic.NOT)
+		case token.XOR:
+			frame.LocalMemory[instr.Name()] = symbolic.NewBinaryOperation(operand, symbolic.NewIntConstant(-1), symbolic.XOR)
 		default:
 			panic(fmt.Sprintf("unsupported unary operator %s", instr.Op))
 		}
@@ -170,6 +174,9 @@ func (interpreter *Interpreter) resolveExpression(value ssa.Value) symbolic.Symb
 			return symbolic.NewIntConstant(value.Int64())
 		case symbolic.BoolType:
 			return symbolic.NewBoolConstant(constant.BoolVal(value.Value))
+		case symbolic.FloatType:
+			float, _ := constant.Float64Val(value.Value)
+			return symbolic.NewFloatConstant(float)
 		}
 	default:
 		frame := interpreter.CallStack[len(interpreter.CallStack)-1]

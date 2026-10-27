@@ -98,7 +98,6 @@ func TestAnalyse(t *testing.T) {
 			},
 		},
 		{
-			// не проходит: BAND и BOR печатаются как && и ||
 			name: "testBitwise",
 			want: []string{
 				"true && (((a & b) | (a | b)) > 0) => ((a ^ b) << 1)",
@@ -106,11 +105,18 @@ func TestAnalyse(t *testing.T) {
 			},
 		},
 		{
-			// не проходит: унарный ^ не поддержан, ^y трактуется как y ^ -1
 			name: "testUnary",
 			want: []string{
 				"true && ((-x ^ -1) > 0) => (-x ^ -1)",
 				"true && !((-x ^ -1) > 0) => -x",
+			},
+		},
+		{
+			name: "testSimpleSum",
+			want: []string{
+				"true && ((b + (a + 1.1)) > 10.1) && ((b + (a + 1.1)) < 11.125) => 1.1",
+				"true && ((b + (a + 1.1)) > 10.1) && !((b + (a + 1.1)) < 11.125) => 1.2",
+				"true && !((b + (a + 1.1)) > 10.1) => 1.2",
 			},
 		},
 		{
@@ -215,8 +221,6 @@ func TestAnalyseLoops(t *testing.T) {
 		{"testWhileLoop", maxBlockVisits},
 		{"testForLoop", maxBlockVisits},
 		{"testInfiniteLoopBreak", maxBlockVisits},
-		// условие i%2 == 0 при конкретном i выполнимо только с одной стороны,
-		// остаётся ветвление по condition
 		{"testLoopWithConcreteBoundAndSymbolicBranching", 2},
 	}
 
