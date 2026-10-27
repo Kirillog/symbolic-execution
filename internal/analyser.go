@@ -6,7 +6,6 @@ import (
 	"symbolic-execution-course/internal/symbolic"
 	"symbolic-execution-course/internal/translator"
 
-	"github.com/ebukreev/go-z3/z3"
 	xssa "golang.org/x/tools/go/ssa"
 )
 
@@ -16,6 +15,12 @@ type Analyser struct {
 	PathSelector PathSelector
 	Results      []Interpreter
 	satisfiable  map[symbolic.SymbolicExpression]bool
+	sessions     map[sessionOpt]*solverSession
+}
+
+type sessionOpt struct {
+	bitvectors bool
+	floats     bool
 }
 
 const maxSteps = 10000
@@ -33,6 +38,7 @@ func Analyse(source string, functionName string) []Interpreter {
 		Function:     function,
 		PathSelector: &RandomPathSelector{},
 		satisfiable:  make(map[symbolic.SymbolicExpression]bool),
+		sessions:     make(map[sessionOpt]*solverSession),
 	}
 	analyser.push(newInterpreter(analyser))
 
@@ -84,34 +90,32 @@ func (analyser *Analyser) isSatisfiable(pathCondition symbolic.SymbolicExpressio
 	if satisfiable, cached := analyser.satisfiable[pathCondition]; cached {
 		return satisfiable
 	}
-	satisfiable := checkSatisfiability(pathCondition)
+	satisfiable := analyser.checkSatisfiability(pathCondition)
 	analyser.satisfiable[pathCondition] = satisfiable
 	return satisfiable
 }
 
-func checkSatisfiability(pathCondition symbolic.SymbolicExpression) bool {
-	constraints := []symbolic.SymbolicExpression{pathCondition}
+func (analyser *Analyser) checkSatisfiability(pathCondition symbolic.SymbolicExpression) bool {
+	key := sessionOpt{
+		bitvectors: symbolic.HasBitwiseOperations(pathCondition),
+		floats:     symbolic.HasFloats(pathCondition),
+	}
+	session, ok := analyser.sessions[key]
+	if !ok {
+		session = newSolverSession(newTranslator(key), !key.floats)
+		analyser.sessions[key] = session
+	}
 
-	var z3Translator *translator.Z3Translator
-	if symbolic.HasBitwiseOperations(pathCondition) {
-		z3Translator = translator.NewBV64Translator()
-	} else {
-		z3Translator = translator.NewIntTranslator()
+	constraints := []symbolic.SymbolicExpression{pathCondition}
+	if !key.bitvectors {
 		constraints = append(constraints, symbolic.RangeConstraints(pathCondition, true)...)
 	}
+	return session.check(constraints)
+}
 
-	solver := z3.NewSolver(z3Translator.GetContext().(*z3.Context))
-	for _, constraint := range constraints {
-		translated, err := z3Translator.TranslateExpression(constraint)
-		if err != nil {
-			panic(err)
-		}
-		solver.Assert(translated.(z3.Bool))
+func newTranslator(key sessionOpt) *translator.Z3Translator {
+	if key.bitvectors {
+		return translator.NewBV64Translator()
 	}
-
-	satisfiable, err := solver.Check()
-	if err != nil {
-		panic(err)
-	}
-	return satisfiable
+	return translator.NewIntTranslator()
 }
