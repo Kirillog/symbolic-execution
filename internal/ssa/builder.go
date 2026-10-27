@@ -2,9 +2,15 @@
 package ssa
 
 import (
+	"fmt"
+	"go/ast"
+	"go/importer"
+	"go/parser"
 	"go/token"
+	"go/types"
 
 	"golang.org/x/tools/go/ssa"
+	"golang.org/x/tools/go/ssa/ssautil"
 )
 
 // Builder отвечает за построение SSA из исходного кода Go
@@ -30,11 +36,27 @@ func (b *Builder) ParseAndBuildSSA(source string, funcName string) (*ssa.Functio
 	// 2. Создание SSA программы
 	// 3. Поиск нужной функции по имени
 
+	f, err := parser.ParseFile(b.fset, "source.go", source, parser.AllErrors)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", "cannot parse source", err)
+	}
+	files := []*ast.File{f}
+	pkg := types.NewPackage(f.Name.Name, f.Name.Name)
+	config := &types.Config{Importer: importer.Default()}
+	hello, _, err := ssautil.BuildPackage(
+		config, b.fset, pkg, files, ssa.SanityCheckFunctions)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", "cannot build SSA", err)
+	}
+	var fun = hello.Func(funcName)
+	if fun == nil {
+		return nil, fmt.Errorf("%s: %w", "function not found", err)
+	}
+	return fun, nil
+
 	// Подсказки:
 	// - Используйте parser.ParseFile для парсинга
 	// - Создайте packages.Config и загрузите пакет
 	// - Используйте ssautil.CreateProgram для создания SSA
 	// - Найдите функцию в SSA программе
-
-	panic("не реализовано")
 }
