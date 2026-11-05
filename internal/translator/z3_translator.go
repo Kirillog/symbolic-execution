@@ -11,10 +11,13 @@ import (
 
 // Z3Translator транслирует символьные выражения в Z3 формулы
 type Z3Translator struct {
-	ctx    *z3.Context
-	config *z3.Config
-	vars   map[string]z3.Value // Кэш переменных
-	theory Theory
+	ctx         *z3.Context
+	config      *z3.Config
+	vars        map[string]z3.Value // Кэш переменных
+	theory      Theory
+	floatTheory FloatTheory
+
+	memo map[symbolic.SymbolicExpression]interface{}
 }
 
 // NewZ3Translator создаёт новый экземпляр Z3 транслятора с теорией целых чисел
@@ -38,10 +41,12 @@ func newZ3Translator(newTheory func(*z3.Context) Theory) *Z3Translator {
 	ctx := z3.NewContext(config)
 
 	return &Z3Translator{
-		ctx:    ctx,
-		config: config,
-		vars:   make(map[string]z3.Value),
-		theory: newTheory(ctx),
+		ctx:         ctx,
+		config:      config,
+		vars:        make(map[string]z3.Value),
+		theory:      newTheory(ctx),
+		floatTheory: NewFP64Theory(ctx),
+		memo:        make(map[symbolic.SymbolicExpression]interface{}),
 	}
 }
 
@@ -53,6 +58,7 @@ func (zt *Z3Translator) GetContext() interface{} {
 // Reset сбрасывает состояние транслятора
 func (zt *Z3Translator) Reset() {
 	zt.vars = make(map[string]z3.Value)
+	zt.memo = make(map[symbolic.SymbolicExpression]interface{})
 }
 
 // Close освобождает ресурсы
@@ -62,7 +68,18 @@ func (zt *Z3Translator) Close() {
 
 // TranslateExpression транслирует символьное выражение в Z3
 func (zt *Z3Translator) TranslateExpression(expr symbolic.SymbolicExpression) (interface{}, error) {
-	return expr.Accept(zt)
+	return zt.translate(expr)
+}
+
+func (zt *Z3Translator) translate(expr symbolic.SymbolicExpression) (interface{}, error) {
+	if cached, ok := zt.memo[expr]; ok {
+		return cached, nil
+	}
+	res, err := expr.Accept(zt)
+	if err == nil {
+		zt.memo[expr] = res
+	}
+	return res, err
 }
 
 // TODO: Реализуйте следующие методы в рамках домашнего задания
@@ -95,6 +112,11 @@ func (zt *Z3Translator) VisitIntConstant(expr *symbolic.IntConstant) (interface{
 	return zt.theory.Const(expr.Value), nil
 }
 
+// VisitFloatConstant транслирует константу float64 в Z3
+func (zt *Z3Translator) VisitFloatConstant(expr *symbolic.FloatConstant) (interface{}, error) {
+	return zt.floatTheory.Const(expr.Value), nil
+}
+
 // VisitBoolConstant транслирует булеву константу в Z3
 func (zt *Z3Translator) VisitBoolConstant(expr *symbolic.BoolConstant) (interface{}, error) {
 	// TODO: Реализовать
@@ -123,11 +145,11 @@ func (zt *Z3Translator) VisitBinaryOperation(expr *symbolic.BinaryOperation) (in
 		if err != nil {
 			return nil, err
 		}
-		distinct := zt.ctx.Distinct(left, right)
+		equal := zt.equal(expr.Left.Type(), left, right)
 		if expr.Operator == symbolic.EQ {
-			return distinct.Not(), nil
+			return equal, nil
 		}
-		return distinct, nil
+		return equal.Not(), nil
 	}
 
 	left, err := translateAs[z3.Value](zt, expr.Left)
@@ -138,11 +160,33 @@ func (zt *Z3Translator) VisitBinaryOperation(expr *symbolic.BinaryOperation) (in
 	if err != nil {
 		return nil, err
 	}
-	res, err := zt.theory.Binary(expr.Operator, left, right)
+	var res z3.Value
+	if expr.Left.Type() == symbolic.FloatType {
+		res, err = zt.floatTheory.Binary(expr.Operator, left, right)
+	} else {
+		res, err = zt.theory.Binary(expr.Operator, left, right)
+	}
 	if err != nil {
 		return nil, NewTranslationError(err.Error(), expr)
 	}
 	return res, nil
+}
+
+func (zt *Z3Translator) equal(operandType symbolic.ExpressionType, left, right z3.Value) z3.Bool {
+	if operandType == symbolic.FloatType {
+		return zt.floatTheory.Equal(left, right)
+	}
+	switch l := left.(type) {
+	case z3.Int:
+		return l.Eq(right.(z3.Int))
+	case z3.BV:
+		return l.Eq(right.(z3.BV))
+	case z3.Bool:
+		return l.Eq(right.(z3.Bool))
+	case z3.Array:
+		return l.Eq(right.(z3.Array))
+	}
+	return zt.ctx.Distinct(left, right).Not()
 }
 
 // VisitLogicalOperation транслирует логическую операцию в Z3
@@ -214,7 +258,12 @@ func (zt *Z3Translator) VisitNegateOperation(expr *symbolic.NegateOperation) (in
 	if err != nil {
 		return nil, err
 	}
-	res, err := zt.theory.Neg(val)
+	var res z3.Value
+	if expr.Operand.Type() == symbolic.FloatType {
+		res, err = zt.floatTheory.Neg(val)
+	} else {
+		res, err = zt.theory.Neg(val)
+	}
 	if err != nil {
 		return nil, NewTranslationError(err.Error(), expr)
 	}
@@ -234,6 +283,8 @@ func (zt *Z3Translator) sortOf(exprType symbolic.ExpressionType) z3.Sort {
 		return zt.theory.Sort()
 	case symbolic.BoolT:
 		return zt.ctx.BoolSort()
+	case symbolic.FloatT:
+		return zt.floatTheory.Sort()
 	case symbolic.ArrayT:
 		return zt.ctx.ArraySort(zt.theory.Sort(), zt.sortOf(exprType.Elem))
 	case symbolic.PtrT:
@@ -262,7 +313,7 @@ func castToZ3Type[T z3.Value](value interface{}) (T, error) {
 
 // translateAs транслирует выражение и приводит результат к Z3 типу T
 func translateAs[T z3.Value](zt *Z3Translator, expr symbolic.SymbolicExpression) (T, error) {
-	v, err := expr.Accept(zt)
+	v, err := zt.translate(expr)
 	if err != nil {
 		var zero T
 		return zero, err

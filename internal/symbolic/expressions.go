@@ -3,6 +3,7 @@ package symbolic
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"symbolic-execution-course/internal/bslices"
 )
@@ -73,6 +74,31 @@ func (ic *IntConstant) Accept(visitor ExpressionVisitorError) (interface{}, erro
 	return visitor.VisitIntConstant(ic)
 }
 
+// FloatConstant представляет константу типа float64
+type FloatConstant struct {
+	Value float64
+}
+
+// NewFloatConstant создаёт новую константу типа float64
+func NewFloatConstant(value float64) *FloatConstant {
+	return &FloatConstant{Value: value}
+}
+
+// Type возвращает тип константы
+func (fc *FloatConstant) Type() ExpressionType {
+	return FloatType
+}
+
+// String возвращает кратчайшее представление, однозначно задающее число
+func (fc *FloatConstant) String() string {
+	return strconv.FormatFloat(fc.Value, 'g', -1, 64)
+}
+
+// Accept реализует Visitor pattern
+func (fc *FloatConstant) Accept(visitor ExpressionVisitorError) (interface{}, error) {
+	return visitor.VisitFloatConstant(fc)
+}
+
 // BoolConstant представляет булеву константу
 type BoolConstant struct {
 	Value bool
@@ -113,7 +139,11 @@ func NewBinaryOperation(left, right SymbolicExpression, op BinaryOperator) *Bina
 	// Создать новую бинарную операцию и проверить совместимость типов
 	lt, rt := left.Type(), right.Type()
 	switch op {
-	case ADD, SUB, MUL, DIV, MOD, LT, LE, GT, GE, BAND, BOR, XOR, SHL, SHR:
+	case ADD, SUB, MUL, DIV, LT, LE, GT, GE:
+		if lt != rt || (lt != IntType && lt != FloatType) {
+			panic(fmt.Sprintf("type mismatch: %s %s %s", lt, op, rt))
+		}
+	case MOD, BAND, BOR, XOR, SHL, SHR:
 		if lt != IntType || rt != IntType {
 			panic(fmt.Sprintf("type mismatch: %s %s %s", lt, op, rt))
 		}
@@ -131,7 +161,9 @@ func (bo *BinaryOperation) Type() ExpressionType {
 	// Определить результирующий тип на основе операции и типов операндов
 	// Например: int + int = int, int < int = bool
 	switch bo.Operator {
-	case ADD, SUB, MUL, DIV, MOD, BAND, BOR, XOR, SHL, SHR:
+	case ADD, SUB, MUL, DIV:
+		return bo.Left.Type()
+	case MOD, BAND, BOR, XOR, SHL, SHR:
 		return IntType
 	case LT, LE, GT, GE, EQ, NE:
 		return BoolType
@@ -269,9 +301,9 @@ func (op BinaryOperator) String() string {
 	case GE:
 		return ">="
 	case BAND:
-		return "&&"
+		return "&"
 	case BOR:
-		return "||"
+		return "|"
 	case XOR:
 		return "^"
 	case SHL:
