@@ -236,6 +236,23 @@ func (zt *Z3Translator) VisitArrayAccess(expr *symbolic.ArrayAccess) (interface{
 	return array.Select(index), nil
 }
 
+// VisitArrayStore implements [symbolic.ExpressionVisitorError].
+func (zt *Z3Translator) VisitArrayStore(expr *symbolic.ArrayStore) (interface{}, error) {
+	array, err := translateAs[z3.Array](zt, expr.Array)
+	if err != nil {
+		return nil, err
+	}
+	index, err := translateAs[z3.Value](zt, expr.Index)
+	if err != nil {
+		return nil, err
+	}
+	value, err := translateAs[z3.Value](zt, expr.Value)
+	if err != nil {
+		return nil, err
+	}
+	return array.Store(index, value), nil
+}
+
 // VisitFunctionCall implements [symbolic.ExpressionVisitorError].
 func (zt *Z3Translator) VisitFunctionCall(expr *symbolic.FunctionCall) (interface{}, error) {
 	arguments, err := MapWithError(expr.Arguments, func(arg symbolic.SymbolicExpression) (z3.Value, error) {
@@ -272,7 +289,7 @@ func (zt *Z3Translator) VisitNegateOperation(expr *symbolic.NegateOperation) (in
 
 // VisitRef implements [symbolic.ExpressionVisitorError].
 func (zt *Z3Translator) VisitRef(expr *symbolic.Ref) (interface{}, error) {
-	return zt.ctx.FromInt(int64(expr.ID), zt.ctx.IntSort()), nil
+	return zt.translate(expr.Addr)
 }
 
 // Вспомогательные методы

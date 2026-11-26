@@ -342,17 +342,17 @@ func (op LogicalOperator) String() string {
 }
 
 type Ref struct {
-	// TODO: Выбрать и написать внутреннее представление символьной ссылки
-	ID       int64
+	Addr 	 SymbolicExpression
 	ExprType ExpressionType
 }
+var NullAddr = NewIntConstant(0)
 
 func (ref *Ref) Type() ExpressionType {
 	return PtrT{Elem: ref.ExprType}
 }
 
 func (ref *Ref) String() string {
-	return fmt.Sprintf("ref(%d)", ref.ID)
+	return fmt.Sprintf("ref(%d)", ref.Addr)
 }
 
 func (ref *Ref) Accept(visitor ExpressionVisitorError) (interface{}, error) {
@@ -374,6 +374,25 @@ func (aa *ArrayAccess) String() string {
 
 func (aa *ArrayAccess) Accept(visitor ExpressionVisitorError) (interface{}, error) {
 	return visitor.VisitArrayAccess(aa)
+}
+
+// ArrayStore представляет массив, полученный из Array записью Value по индексу Index: store(Array, Index, Value)
+type ArrayStore struct {
+	Array SymbolicExpression
+	Index SymbolicExpression
+	Value SymbolicExpression
+}
+
+func (as *ArrayStore) Type() ExpressionType {
+	return as.Array.Type()
+}
+
+func (as *ArrayStore) String() string {
+	return fmt.Sprintf("store(%s, %s, %s)", as.Array, as.Index, as.Value)
+}
+
+func (as *ArrayStore) Accept(visitor ExpressionVisitorError) (interface{}, error) {
+	return visitor.VisitArrayStore(as)
 }
 
 type FunctionCall struct {

@@ -14,8 +14,14 @@ type Memory interface {
 	GetFromArray(ref *symbolic.Ref, index int) symbolic.SymbolicExpression
 }
 
+type FieldKey struct {
+	Type *symbolic.StructT
+	Idx int
+}
+
 type SymbolicMemory struct {
-	// TODO: Реализуйте внутреннее представление символьной памяти
+	Fields map[FieldKey] symbolic.SymbolicExpression
+	Arrays map[symbolic.ExpressionType] symbolic.SymbolicExpression
 }
 
 func NewSymbolicMemory() SymbolicMemory {

@@ -43,6 +43,10 @@ func (v *BitwiseOperationsVisitor) VisitArrayAccess(expr *ArrayAccess) interface
 	return v.anyOf(expr.Array, expr.Index)
 }
 
+func (v *BitwiseOperationsVisitor) VisitArrayStore(expr *ArrayStore) interface{} {
+	return v.anyOf(expr.Array, expr.Index, expr.Value)
+}
+
 func (v *BitwiseOperationsVisitor) VisitFunctionCall(expr *FunctionCall) interface{} {
 	return v.anyOf(expr.Arguments...)
 }

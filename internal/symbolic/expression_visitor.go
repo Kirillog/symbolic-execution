@@ -12,6 +12,7 @@ type ExpressionVisitor interface {
 	VisitLogicalOperation(expr *LogicalOperation) interface{}
 	VisitRef(expr *Ref) interface{}
 	VisitArrayAccess(expr *ArrayAccess) interface{}
+	VisitArrayStore(expr *ArrayStore) interface{}
 	VisitFunctionCall(expr *FunctionCall) interface{}
 }
 
@@ -63,6 +64,10 @@ func (a expressionVisitorAdapter) VisitRef(expr *Ref) (interface{}, error) {
 
 func (a expressionVisitorAdapter) VisitArrayAccess(expr *ArrayAccess) (interface{}, error) {
 	return a.visitor.VisitArrayAccess(expr), nil
+}
+
+func (a expressionVisitorAdapter) VisitArrayStore(expr *ArrayStore) (interface{}, error) {
+	return a.visitor.VisitArrayStore(expr), nil
 }
 
 func (a expressionVisitorAdapter) VisitFunctionCall(expr *FunctionCall) (interface{}, error) {

@@ -28,6 +28,7 @@ type ExpressionTranslator interface {
 	VisitNegateOperation(expr *symbolic.NegateOperation) (interface{}, error)
 	VisitRef(expr *symbolic.Ref) (interface{}, error)
 	VisitArrayAccess(expr *symbolic.ArrayAccess) (interface{}, error)
+	VisitArrayStore(expr *symbolic.ArrayStore) (interface{}, error)
 	VisitFunctionCall(expr *symbolic.FunctionCall) (interface{}, error)
 }
 

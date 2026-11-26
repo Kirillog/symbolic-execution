@@ -37,6 +37,10 @@ func (v *FloatsVisitor) VisitArrayAccess(expr *ArrayAccess) interface{} {
 	return expr.Type() == FloatType || v.anyOf(expr.Array, expr.Index)
 }
 
+func (v *FloatsVisitor) VisitArrayStore(expr *ArrayStore) interface{} {
+	return v.anyOf(expr.Array, expr.Index, expr.Value)
+}
+
 func (v *FloatsVisitor) VisitFunctionCall(expr *FunctionCall) interface{} {
 	return expr.Type() == FloatType || v.anyOf(expr.Arguments...)
 }

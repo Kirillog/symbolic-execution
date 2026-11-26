@@ -61,6 +61,11 @@ func (v *rangeConstraintsVisitor) VisitArrayAccess(expr *ArrayAccess) interface{
 	return nil
 }
 
+func (v *rangeConstraintsVisitor) VisitArrayStore(expr *ArrayStore) interface{} {
+	v.walk(expr.Array, expr.Index, expr.Value)
+	return nil
+}
+
 func (v *rangeConstraintsVisitor) VisitFunctionCall(expr *FunctionCall) interface{} {
 	v.walk(expr.Arguments...)
 	v.bound(expr)

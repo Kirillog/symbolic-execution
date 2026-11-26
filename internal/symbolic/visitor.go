@@ -11,6 +11,7 @@ type ExpressionVisitorError interface {
 	VisitLogicalOperation(expr *LogicalOperation) (interface{}, error)
 	VisitRef(expr *Ref) (interface{}, error)
 	VisitArrayAccess(expr *ArrayAccess) (interface{}, error)
+	VisitArrayStore(expr *ArrayStore) (interface{}, error)
 	VisitFunctionCall(expr *FunctionCall) (interface{}, error)
 	// TODO: Добавьте методы для других типов выражений по мере необходимости
 }
