@@ -16,6 +16,7 @@ type Z3Translator struct {
 	vars        map[symbolic.SymbolicVariable]z3.Value // Кэш переменных
 	theory      Theory
 	floatTheory FloatTheory
+	strings     stringTable
 
 	memo map[symbolic.SymbolicExpression]interface{}
 }
@@ -46,6 +47,7 @@ func newZ3Translator(newTheory func(*z3.Context) Theory) *Z3Translator {
 		vars:        make(map[symbolic.SymbolicVariable]z3.Value),
 		theory:      newTheory(ctx),
 		floatTheory: NewFP64Theory(ctx),
+		strings:     newStringTable(ctx),
 		memo:        make(map[symbolic.SymbolicExpression]interface{}),
 	}
 }
@@ -115,6 +117,10 @@ func (zt *Z3Translator) VisitIntConstant(expr *symbolic.IntConstant) (interface{
 // VisitFloatConstant транслирует константу float64 в Z3
 func (zt *Z3Translator) VisitFloatConstant(expr *symbolic.FloatConstant) (interface{}, error) {
 	return zt.floatTheory.Const(expr.Value), nil
+}
+
+func (zt *Z3Translator) VisitStringConstant(expr *symbolic.StringConstant) (interface{}, error) {
+	return zt.strings.intern(zt.ctx, expr.Value), nil
 }
 
 // VisitBoolConstant транслирует булеву константу в Z3
@@ -228,7 +234,7 @@ func (zt *Z3Translator) VisitArrayConstant(expr *symbolic.ArrayConstant) (interf
 	if err != nil {
 		return nil, err
 	}
-	return zt.ctx.ConstArray(zt.theory.Sort(), value), nil
+	return zt.ctx.ConstArray(zt.sortOf(expr.Type().(symbolic.ArrayT).IndexType()), value), nil
 }
 
 // VisitArrayAccess implements [symbolic.ExpressionVisitorError].
@@ -304,8 +310,10 @@ func (zt *Z3Translator) VisitRef(expr *symbolic.Ref) (interface{}, error) {
 
 func (zt *Z3Translator) sortOf(exprType symbolic.ExpressionType) z3.Sort {
 	switch exprType := exprType.(type) {
-	case symbolic.IntT, symbolic.PtrT:
+	case symbolic.IntT, symbolic.AddrT, symbolic.PtrT:
 		return zt.theory.Sort()
+	case symbolic.StringT:
+		return zt.ctx.IntSort()
 	case symbolic.BoolT:
 		return zt.ctx.BoolSort()
 	case symbolic.FloatT:

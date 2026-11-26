@@ -192,6 +192,16 @@ func (bo *BinaryOperation) Accept(visitor ExpressionVisitorError) (interface{}, 
 	return visitor.VisitBinaryOperation(bo)
 }
 
+type StringConstant struct {
+	Value string
+}
+
+func (*StringConstant) Type() ExpressionType { return StringType }
+func (c *StringConstant) String() string     { return strconv.Quote(c.Value) }
+func (c *StringConstant) Accept(visitor ExpressionVisitorError) (interface{}, error) {
+	return visitor.VisitStringConstant(c)
+}
+
 type NegateOperation struct {
 	Operand SymbolicExpression
 }
@@ -374,10 +384,11 @@ func (ref *Ref) Accept(visitor ExpressionVisitorError) (interface{}, error) {
 // ArrayConstant представляет массив с одним и тем же значением по всем индексам.
 type ArrayConstant struct {
 	Value SymbolicExpression
+	Index ExpressionType
 }
 
 func (ac *ArrayConstant) Type() ExpressionType {
-	return ArrayT{Elem: ac.Value.Type()}
+	return ArrayT{Elem: ac.Value.Type(), Index: ac.Index}
 }
 
 func (ac *ArrayConstant) String() string {

@@ -15,8 +15,9 @@ type IntT struct{}
 type AddrT struct{}
 type BoolT struct{}
 type FloatT struct{}
+type StringT struct{}
 type ArrayT struct {
-	Elem ExpressionType
+	Elem  ExpressionType
 	Index ExpressionType
 }
 
@@ -28,6 +29,7 @@ func (a ArrayT) IndexType() ExpressionType {
 }
 
 type PtrT struct{ Elem ExpressionType }
+
 type StructT struct {
 	Name   string
 	Fields []ExpressionType
@@ -37,16 +39,19 @@ func (IntT) String() string     { return "int" }
 func (AddrT) String() string    { return "addr" }
 func (BoolT) String() string    { return "bool" }
 func (FloatT) String() string   { return "float64" }
+func (StringT) String() string  { return "string" }
 func (a ArrayT) String() string { return "[]" + a.Elem.String() }
-func (p PtrT) String() string   { return "*" + p.Elem.String() }
+
+func (p PtrT) String() string { return "*" + p.Elem.String() }
 func (s *StructT) String() string {
 	fields := bslices.Map(s.Fields, func(t ExpressionType) string { return t.String() })
 	return s.Name + "{" + strings.Join(fields, ", ") + "}"
 }
 
 var (
-	IntType   ExpressionType = IntT{}
-	AddrType  ExpressionType = AddrT{}
-	BoolType  ExpressionType = BoolT{}
-	FloatType ExpressionType = FloatT{}
+	IntType    ExpressionType = IntT{}
+	AddrType   ExpressionType = AddrT{}
+	BoolType   ExpressionType = BoolT{}
+	FloatType  ExpressionType = FloatT{}
+	StringType ExpressionType = StringT{}
 )

@@ -26,7 +26,11 @@ func (zt *Z3Translator) Evaluate(model *z3.Model, expr symbolic.SymbolicExpressi
 			return symbolic.NewBoolConstant(v), nil
 		}
 	case z3.Int:
-		if v, isLiteral, ok := literal.AsInt64(); isLiteral && ok {
+		if expr.Type() == symbolic.StringType {
+			if v, ok := zt.strings.resolve(literal); ok {
+				return &symbolic.StringConstant{Value: v}, nil
+			}
+		} else if v, isLiteral, ok := literal.AsInt64(); isLiteral && ok {
 			return integerConstant(v, expr.Type()), nil
 		}
 	case z3.BV:

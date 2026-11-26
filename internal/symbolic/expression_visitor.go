@@ -7,6 +7,8 @@ type ExpressionVisitor interface {
 	VisitIntConstant(expr *IntConstant) interface{}
 	VisitFloatConstant(expr *FloatConstant) interface{}
 	VisitBoolConstant(expr *BoolConstant) interface{}
+	VisitStringConstant(expr *StringConstant) interface{}
+
 	VisitNegateOperation(expr *NegateOperation) interface{}
 	VisitBinaryOperation(expr *BinaryOperation) interface{}
 	VisitLogicalOperation(expr *LogicalOperation) interface{}
@@ -45,6 +47,10 @@ func (a expressionVisitorAdapter) VisitFloatConstant(expr *FloatConstant) (inter
 
 func (a expressionVisitorAdapter) VisitBoolConstant(expr *BoolConstant) (interface{}, error) {
 	return a.visitor.VisitBoolConstant(expr), nil
+}
+
+func (a expressionVisitorAdapter) VisitStringConstant(expr *StringConstant) (interface{}, error) {
+	return a.visitor.VisitStringConstant(expr), nil
 }
 
 func (a expressionVisitorAdapter) VisitNegateOperation(expr *NegateOperation) (interface{}, error) {

@@ -33,9 +33,10 @@ func (v *rangeConstraintsVisitor) VisitVariable(expr *SymbolicVariable) interfac
 	return nil
 }
 
-func (v *rangeConstraintsVisitor) VisitIntConstant(*IntConstant) interface{}     { return nil }
-func (v *rangeConstraintsVisitor) VisitFloatConstant(*FloatConstant) interface{} { return nil }
-func (v *rangeConstraintsVisitor) VisitBoolConstant(*BoolConstant) interface{}   { return nil }
+func (v *rangeConstraintsVisitor) VisitIntConstant(*IntConstant) interface{}       { return nil }
+func (v *rangeConstraintsVisitor) VisitFloatConstant(*FloatConstant) interface{}   { return nil }
+func (v *rangeConstraintsVisitor) VisitBoolConstant(*BoolConstant) interface{}     { return nil }
+func (v *rangeConstraintsVisitor) VisitStringConstant(*StringConstant) interface{} { return nil }
 
 func (v *rangeConstraintsVisitor) VisitRef(expr *Ref) interface{} {
 	v.walk(expr.Addr)

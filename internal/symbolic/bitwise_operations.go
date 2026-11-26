@@ -17,10 +17,11 @@ func NewBitwiseOperationsVisitor() *BitwiseOperationsVisitor {
 	return &BitwiseOperationsVisitor{visited: make(map[SymbolicExpression]struct{})}
 }
 
-func (*BitwiseOperationsVisitor) VisitVariable(*SymbolicVariable) interface{}   { return false }
-func (*BitwiseOperationsVisitor) VisitIntConstant(*IntConstant) interface{}     { return false }
-func (*BitwiseOperationsVisitor) VisitFloatConstant(*FloatConstant) interface{} { return false }
-func (*BitwiseOperationsVisitor) VisitBoolConstant(*BoolConstant) interface{}   { return false }
+func (*BitwiseOperationsVisitor) VisitVariable(*SymbolicVariable) interface{}     { return false }
+func (*BitwiseOperationsVisitor) VisitIntConstant(*IntConstant) interface{}       { return false }
+func (*BitwiseOperationsVisitor) VisitFloatConstant(*FloatConstant) interface{}   { return false }
+func (*BitwiseOperationsVisitor) VisitBoolConstant(*BoolConstant) interface{}     { return false }
+func (*BitwiseOperationsVisitor) VisitStringConstant(*StringConstant) interface{} { return false }
 
 func (v *BitwiseOperationsVisitor) VisitRef(expr *Ref) interface{} {
 	return v.anyOf(expr.Addr)

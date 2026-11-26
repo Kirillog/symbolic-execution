@@ -16,9 +16,10 @@ func NewFloatsVisitor() *FloatsVisitor {
 func (*FloatsVisitor) VisitVariable(expr *SymbolicVariable) interface{} {
 	return expr.Type() == FloatType
 }
-func (*FloatsVisitor) VisitIntConstant(*IntConstant) interface{}     { return false }
-func (*FloatsVisitor) VisitFloatConstant(*FloatConstant) interface{} { return true }
-func (*FloatsVisitor) VisitBoolConstant(*BoolConstant) interface{}   { return false }
+func (*FloatsVisitor) VisitIntConstant(*IntConstant) interface{}       { return false }
+func (*FloatsVisitor) VisitFloatConstant(*FloatConstant) interface{}   { return true }
+func (*FloatsVisitor) VisitBoolConstant(*BoolConstant) interface{}     { return false }
+func (*FloatsVisitor) VisitStringConstant(*StringConstant) interface{} { return false }
 
 func (v *FloatsVisitor) VisitRef(expr *Ref) interface{} {
 	return v.anyOf(expr.Addr)

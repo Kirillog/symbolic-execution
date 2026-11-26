@@ -6,6 +6,8 @@ type ExpressionVisitorError interface {
 	VisitIntConstant(expr *IntConstant) (interface{}, error)
 	VisitFloatConstant(expr *FloatConstant) (interface{}, error)
 	VisitBoolConstant(expr *BoolConstant) (interface{}, error)
+	VisitStringConstant(expr *StringConstant) (interface{}, error)
+
 	VisitNegateOperation(expr *NegateOperation) (interface{}, error)
 	VisitBinaryOperation(expr *BinaryOperation) (interface{}, error)
 	VisitLogicalOperation(expr *LogicalOperation) (interface{}, error)
