@@ -7,8 +7,6 @@ import (
 	"symbolic-execution-course/internal/symbolic"
 )
 
-// Address identifies a cell or an aggregate within a heap allocation.
-// Field selection adjusts the first slot, and array selection adds an SMT index.
 type Address struct {
 	Ref     *symbolic.Ref
 	Elem    symbolic.ExpressionType
@@ -31,7 +29,6 @@ func (a Address) Element(index symbolic.SymbolicExpression) Address {
 	return a
 }
 
-// StructValue holds a snapshot with one column per leaf field.
 type StructValue struct {
 	tpe    *symbolic.StructT
 	fields []symbolic.SymbolicExpression
@@ -50,7 +47,6 @@ func (v *StructValue) Field(index int) symbolic.SymbolicExpression {
 	return pack(field, v.fields[start:start+len(columnTypes(field))])
 }
 
-// ArrayValue holds a snapshot with one SMT array per element column.
 type ArrayValue struct {
 	tpe      symbolic.ArrayT
 	elements []symbolic.SymbolicExpression

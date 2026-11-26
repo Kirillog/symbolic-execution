@@ -6,7 +6,6 @@ import (
 	"github.com/ebukreev/go-z3/z3"
 )
 
-// stringTable shares one set of IDs across all queries in a Z3 context.
 type stringTable struct {
 	ids    map[string]z3.Int
 	values map[string]string
