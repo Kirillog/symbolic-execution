@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"symbolic-execution-course/internal/bslices"
+	"sync/atomic"
 )
 
 // SymbolicExpression - базовый интерфейс для всех символьных выражений
@@ -32,6 +33,14 @@ func NewSymbolicVariable(name string, exprType ExpressionType) *SymbolicVariable
 		Name:     name,
 		ExprType: exprType,
 	}
+}
+
+var internalVariableID atomic.Uint64
+
+// NewFreshSymbolicVariable создаёт обычную переменную с уникальным именем.
+// Префикс $ отделяет внутренние имена от идентификаторов Go.
+func NewFreshSymbolicVariable(name string, exprType ExpressionType) *SymbolicVariable {
+	return NewSymbolicVariable(fmt.Sprintf("$%s.%d", name, internalVariableID.Add(1)), exprType)
 }
 
 // Type возвращает тип переменной
@@ -341,10 +350,13 @@ func (op LogicalOperator) String() string {
 	}
 }
 
+// Ref хранит адрес объекта и тип, на который указывает ссылка.
 type Ref struct {
-	Addr 	 SymbolicExpression
+	// Addr может быть целочисленным выражением или прочитанным значением указателя.
+	Addr     SymbolicExpression
 	ExprType ExpressionType
 }
+
 var NullAddr = NewIntConstant(0)
 
 func (ref *Ref) Type() ExpressionType {
@@ -352,11 +364,28 @@ func (ref *Ref) Type() ExpressionType {
 }
 
 func (ref *Ref) String() string {
-	return fmt.Sprintf("ref(%d)", ref.Addr)
+	return fmt.Sprintf("ref(%s)", ref.Addr)
 }
 
 func (ref *Ref) Accept(visitor ExpressionVisitorError) (interface{}, error) {
 	return visitor.VisitRef(ref)
+}
+
+// ArrayConstant представляет массив с одним и тем же значением по всем индексам.
+type ArrayConstant struct {
+	Value SymbolicExpression
+}
+
+func (ac *ArrayConstant) Type() ExpressionType {
+	return ArrayT{Elem: ac.Value.Type()}
+}
+
+func (ac *ArrayConstant) String() string {
+	return fmt.Sprintf("constArray(%s)", ac.Value)
+}
+
+func (ac *ArrayConstant) Accept(visitor ExpressionVisitorError) (interface{}, error) {
+	return visitor.VisitArrayConstant(ac)
 }
 
 type ArrayAccess struct {

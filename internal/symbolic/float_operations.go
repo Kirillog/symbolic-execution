@@ -19,7 +19,14 @@ func (*FloatsVisitor) VisitVariable(expr *SymbolicVariable) interface{} {
 func (*FloatsVisitor) VisitIntConstant(*IntConstant) interface{}     { return false }
 func (*FloatsVisitor) VisitFloatConstant(*FloatConstant) interface{} { return true }
 func (*FloatsVisitor) VisitBoolConstant(*BoolConstant) interface{}   { return false }
-func (*FloatsVisitor) VisitRef(*Ref) interface{}                     { return false }
+
+func (v *FloatsVisitor) VisitRef(expr *Ref) interface{} {
+	return v.anyOf(expr.Addr)
+}
+
+func (v *FloatsVisitor) VisitArrayConstant(expr *ArrayConstant) interface{} {
+	return v.anyOf(expr.Value)
+}
 
 func (v *FloatsVisitor) VisitBinaryOperation(expr *BinaryOperation) interface{} {
 	return v.anyOf(expr.Left, expr.Right)

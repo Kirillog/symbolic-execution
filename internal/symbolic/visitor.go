@@ -10,6 +10,7 @@ type ExpressionVisitorError interface {
 	VisitBinaryOperation(expr *BinaryOperation) (interface{}, error)
 	VisitLogicalOperation(expr *LogicalOperation) (interface{}, error)
 	VisitRef(expr *Ref) (interface{}, error)
+	VisitArrayConstant(expr *ArrayConstant) (interface{}, error)
 	VisitArrayAccess(expr *ArrayAccess) (interface{}, error)
 	VisitArrayStore(expr *ArrayStore) (interface{}, error)
 	VisitFunctionCall(expr *FunctionCall) (interface{}, error)

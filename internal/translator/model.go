@@ -27,11 +27,11 @@ func (zt *Z3Translator) Evaluate(model *z3.Model, expr symbolic.SymbolicExpressi
 		}
 	case z3.Int:
 		if v, isLiteral, ok := literal.AsInt64(); isLiteral && ok {
-			return symbolic.NewIntConstant(v), nil
+			return integerConstant(v, expr.Type()), nil
 		}
 	case z3.BV:
 		if v, isLiteral, ok := literal.AsInt64(); isLiteral && ok {
-			return symbolic.NewIntConstant(v), nil
+			return integerConstant(v, expr.Type()), nil
 		}
 	case z3.Float:
 		if v, isLiteral := literal.AsBigFloat(); isLiteral {
@@ -43,4 +43,12 @@ func (zt *Z3Translator) Evaluate(model *z3.Model, expr symbolic.SymbolicExpressi
 		}
 	}
 	return nil, NewTranslationError(fmt.Sprintf("model value %s is not a literal of type %s", value, expr.Type()), expr)
+}
+
+func integerConstant(value int64, exprType symbolic.ExpressionType) symbolic.SymbolicExpression {
+	constant := symbolic.NewIntConstant(value)
+	if typ, ok := exprType.(symbolic.PtrT); ok {
+		return &symbolic.Ref{Addr: constant, ExprType: typ.Elem}
+	}
+	return constant
 }
