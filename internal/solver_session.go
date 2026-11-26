@@ -29,8 +29,7 @@ func (session *solverSession) newSolver() *z3.Solver {
 	return z3.NewSolver(session.translator.GetContext().(*z3.Context))
 }
 
-// check сообщает, выполнима ли конъюнкция constraints.
-func (session *solverSession) check(constraints []symbolic.SymbolicExpression) bool {
+func (session *solverSession) solve(constraints []symbolic.SymbolicExpression) *z3.Model {
 	solver := session.solver
 	if solver != nil {
 		solver.Push()
@@ -51,5 +50,8 @@ func (session *solverSession) check(constraints []symbolic.SymbolicExpression) b
 	if err != nil {
 		panic(err)
 	}
-	return satisfiable
+	if !satisfiable {
+		return nil
+	}
+	return solver.Model()
 }
