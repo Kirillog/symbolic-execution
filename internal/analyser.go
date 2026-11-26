@@ -6,6 +6,7 @@ import (
 	"symbolic-execution-course/internal/symbolic"
 	"symbolic-execution-course/internal/translator"
 
+	"github.com/ebukreev/go-z3/z3"
 	xssa "golang.org/x/tools/go/ssa"
 )
 
@@ -95,11 +96,56 @@ func (analyser *Analyser) isSatisfiable(pathCondition symbolic.SymbolicExpressio
 	return satisfiable
 }
 
-func (analyser *Analyser) checkSatisfiability(pathCondition symbolic.SymbolicExpression) bool {
-	key := sessionOpt{
-		bitvectors: symbolic.HasBitwiseOperations(pathCondition),
-		floats:     symbolic.HasFloats(pathCondition),
+func sessionKey(pathCondition symbolic.SymbolicExpression, terms []symbolic.SymbolicExpression) sessionOpt {
+	var key sessionOpt
+	for _, expr := range append([]symbolic.SymbolicExpression{pathCondition}, terms...) {
+		key.bitvectors = key.bitvectors || symbolic.HasBitwiseOperations(expr)
+		key.floats = key.floats || symbolic.HasFloats(expr)
 	}
+	return key
+}
+
+func (analyser *Analyser) checkSatisfiability(pathCondition symbolic.SymbolicExpression) bool {
+	_, model := analyser.solve(sessionKey(pathCondition, nil), pathCondition, nil)
+	return model != nil
+}
+
+func (analyser *Analyser) Concretize(state Interpreter) (args []symbolic.SymbolicExpression, result symbolic.SymbolicExpression, ok bool) {
+	frame := state.CallStack[0]
+	params := analyser.Function.Params
+	terms := make([]symbolic.SymbolicExpression, 0, len(params)+1)
+	for _, param := range params {
+		terms = append(terms, frame.LocalMemory[param.Name()])
+	}
+	if state.Panic == nil && frame.ReturnValue != nil {
+		terms = append(terms, frame.ReturnValue)
+	}
+
+	key := sessionKey(state.PathCondition, terms)
+	session, model := analyser.solve(key, state.PathCondition, terms)
+	if model == nil && !key.bitvectors {
+		key.bitvectors = true
+		session, model = analyser.solve(key, state.PathCondition, terms)
+	}
+	if model == nil {
+		return nil, nil, false
+	}
+	values := make([]symbolic.SymbolicExpression, len(terms))
+	for i, term := range terms {
+		value, err := session.translator.Evaluate(model, term)
+		if err != nil {
+			panic(err)
+		}
+		values[i] = value
+	}
+	if len(values) > len(params) {
+		result = values[len(params)]
+	}
+	return values[:len(params)], result, true
+}
+
+func (analyser *Analyser) solve(key sessionOpt, pathCondition symbolic.SymbolicExpression, terms []symbolic.SymbolicExpression) (*solverSession, *z3.Model) {
+	exprs := append([]symbolic.SymbolicExpression{pathCondition}, terms...)
 	session, ok := analyser.sessions[key]
 	if !ok {
 		session = newSolverSession(newTranslator(key), !key.floats)
@@ -108,9 +154,11 @@ func (analyser *Analyser) checkSatisfiability(pathCondition symbolic.SymbolicExp
 
 	constraints := []symbolic.SymbolicExpression{pathCondition}
 	if !key.bitvectors {
-		constraints = append(constraints, symbolic.RangeConstraints(pathCondition, true)...)
+		for _, expr := range exprs {
+			constraints = append(constraints, symbolic.RangeConstraints(expr, true)...)
+		}
 	}
-	return session.check(constraints)
+	return session, session.solve(constraints)
 }
 
 func newTranslator(key sessionOpt) *translator.Z3Translator {

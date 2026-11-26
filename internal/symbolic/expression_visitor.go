@@ -7,11 +7,15 @@ type ExpressionVisitor interface {
 	VisitIntConstant(expr *IntConstant) interface{}
 	VisitFloatConstant(expr *FloatConstant) interface{}
 	VisitBoolConstant(expr *BoolConstant) interface{}
+	VisitStringConstant(expr *StringConstant) interface{}
+
 	VisitNegateOperation(expr *NegateOperation) interface{}
 	VisitBinaryOperation(expr *BinaryOperation) interface{}
 	VisitLogicalOperation(expr *LogicalOperation) interface{}
 	VisitRef(expr *Ref) interface{}
+	VisitArrayConstant(expr *ArrayConstant) interface{}
 	VisitArrayAccess(expr *ArrayAccess) interface{}
+	VisitArrayStore(expr *ArrayStore) interface{}
 	VisitFunctionCall(expr *FunctionCall) interface{}
 }
 
@@ -45,6 +49,10 @@ func (a expressionVisitorAdapter) VisitBoolConstant(expr *BoolConstant) (interfa
 	return a.visitor.VisitBoolConstant(expr), nil
 }
 
+func (a expressionVisitorAdapter) VisitStringConstant(expr *StringConstant) (interface{}, error) {
+	return a.visitor.VisitStringConstant(expr), nil
+}
+
 func (a expressionVisitorAdapter) VisitNegateOperation(expr *NegateOperation) (interface{}, error) {
 	return a.visitor.VisitNegateOperation(expr), nil
 }
@@ -61,8 +69,16 @@ func (a expressionVisitorAdapter) VisitRef(expr *Ref) (interface{}, error) {
 	return a.visitor.VisitRef(expr), nil
 }
 
+func (a expressionVisitorAdapter) VisitArrayConstant(expr *ArrayConstant) (interface{}, error) {
+	return a.visitor.VisitArrayConstant(expr), nil
+}
+
 func (a expressionVisitorAdapter) VisitArrayAccess(expr *ArrayAccess) (interface{}, error) {
 	return a.visitor.VisitArrayAccess(expr), nil
+}
+
+func (a expressionVisitorAdapter) VisitArrayStore(expr *ArrayStore) (interface{}, error) {
+	return a.visitor.VisitArrayStore(expr), nil
 }
 
 func (a expressionVisitorAdapter) VisitFunctionCall(expr *FunctionCall) (interface{}, error) {

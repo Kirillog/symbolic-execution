@@ -16,10 +16,18 @@ func NewFloatsVisitor() *FloatsVisitor {
 func (*FloatsVisitor) VisitVariable(expr *SymbolicVariable) interface{} {
 	return expr.Type() == FloatType
 }
-func (*FloatsVisitor) VisitIntConstant(*IntConstant) interface{}     { return false }
-func (*FloatsVisitor) VisitFloatConstant(*FloatConstant) interface{} { return true }
-func (*FloatsVisitor) VisitBoolConstant(*BoolConstant) interface{}   { return false }
-func (*FloatsVisitor) VisitRef(*Ref) interface{}                     { return false }
+func (*FloatsVisitor) VisitIntConstant(*IntConstant) interface{}       { return false }
+func (*FloatsVisitor) VisitFloatConstant(*FloatConstant) interface{}   { return true }
+func (*FloatsVisitor) VisitBoolConstant(*BoolConstant) interface{}     { return false }
+func (*FloatsVisitor) VisitStringConstant(*StringConstant) interface{} { return false }
+
+func (v *FloatsVisitor) VisitRef(expr *Ref) interface{} {
+	return v.anyOf(expr.Addr)
+}
+
+func (v *FloatsVisitor) VisitArrayConstant(expr *ArrayConstant) interface{} {
+	return v.anyOf(expr.Value)
+}
 
 func (v *FloatsVisitor) VisitBinaryOperation(expr *BinaryOperation) interface{} {
 	return v.anyOf(expr.Left, expr.Right)
@@ -35,6 +43,10 @@ func (v *FloatsVisitor) VisitLogicalOperation(expr *LogicalOperation) interface{
 
 func (v *FloatsVisitor) VisitArrayAccess(expr *ArrayAccess) interface{} {
 	return expr.Type() == FloatType || v.anyOf(expr.Array, expr.Index)
+}
+
+func (v *FloatsVisitor) VisitArrayStore(expr *ArrayStore) interface{} {
+	return v.anyOf(expr.Array, expr.Index, expr.Value)
 }
 
 func (v *FloatsVisitor) VisitFunctionCall(expr *FunctionCall) interface{} {

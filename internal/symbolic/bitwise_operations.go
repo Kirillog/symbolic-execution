@@ -17,11 +17,19 @@ func NewBitwiseOperationsVisitor() *BitwiseOperationsVisitor {
 	return &BitwiseOperationsVisitor{visited: make(map[SymbolicExpression]struct{})}
 }
 
-func (*BitwiseOperationsVisitor) VisitVariable(*SymbolicVariable) interface{}   { return false }
-func (*BitwiseOperationsVisitor) VisitIntConstant(*IntConstant) interface{}     { return false }
-func (*BitwiseOperationsVisitor) VisitFloatConstant(*FloatConstant) interface{} { return false }
-func (*BitwiseOperationsVisitor) VisitBoolConstant(*BoolConstant) interface{}   { return false }
-func (*BitwiseOperationsVisitor) VisitRef(*Ref) interface{}                     { return false }
+func (*BitwiseOperationsVisitor) VisitVariable(*SymbolicVariable) interface{}     { return false }
+func (*BitwiseOperationsVisitor) VisitIntConstant(*IntConstant) interface{}       { return false }
+func (*BitwiseOperationsVisitor) VisitFloatConstant(*FloatConstant) interface{}   { return false }
+func (*BitwiseOperationsVisitor) VisitBoolConstant(*BoolConstant) interface{}     { return false }
+func (*BitwiseOperationsVisitor) VisitStringConstant(*StringConstant) interface{} { return false }
+
+func (v *BitwiseOperationsVisitor) VisitRef(expr *Ref) interface{} {
+	return v.anyOf(expr.Addr)
+}
+
+func (v *BitwiseOperationsVisitor) VisitArrayConstant(expr *ArrayConstant) interface{} {
+	return v.anyOf(expr.Value)
+}
 
 func (v *BitwiseOperationsVisitor) VisitBinaryOperation(expr *BinaryOperation) interface{} {
 	switch expr.Operator {
@@ -41,6 +49,10 @@ func (v *BitwiseOperationsVisitor) VisitLogicalOperation(expr *LogicalOperation)
 
 func (v *BitwiseOperationsVisitor) VisitArrayAccess(expr *ArrayAccess) interface{} {
 	return v.anyOf(expr.Array, expr.Index)
+}
+
+func (v *BitwiseOperationsVisitor) VisitArrayStore(expr *ArrayStore) interface{} {
+	return v.anyOf(expr.Array, expr.Index, expr.Value)
 }
 
 func (v *BitwiseOperationsVisitor) VisitFunctionCall(expr *FunctionCall) interface{} {

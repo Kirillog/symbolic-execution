@@ -23,11 +23,15 @@ type ExpressionTranslator interface {
 	VisitVariable(expr *symbolic.SymbolicVariable) (interface{}, error)
 	VisitIntConstant(expr *symbolic.IntConstant) (interface{}, error)
 	VisitBoolConstant(expr *symbolic.BoolConstant) (interface{}, error)
+	VisitStringConstant(expr *symbolic.StringConstant) (interface{}, error)
+
 	VisitBinaryOperation(expr *symbolic.BinaryOperation) (interface{}, error)
 	VisitLogicalOperation(expr *symbolic.LogicalOperation) (interface{}, error)
 	VisitNegateOperation(expr *symbolic.NegateOperation) (interface{}, error)
 	VisitRef(expr *symbolic.Ref) (interface{}, error)
+	VisitArrayConstant(expr *symbolic.ArrayConstant) (interface{}, error)
 	VisitArrayAccess(expr *symbolic.ArrayAccess) (interface{}, error)
+	VisitArrayStore(expr *symbolic.ArrayStore) (interface{}, error)
 	VisitFunctionCall(expr *symbolic.FunctionCall) (interface{}, error)
 }
 

@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"symbolic-execution-course/internal/bslices"
+	"sync/atomic"
 )
 
 // SymbolicExpression - базовый интерфейс для всех символьных выражений
@@ -32,6 +33,14 @@ func NewSymbolicVariable(name string, exprType ExpressionType) *SymbolicVariable
 		Name:     name,
 		ExprType: exprType,
 	}
+}
+
+var internalVariableID atomic.Uint64
+
+// NewFreshSymbolicVariable создаёт обычную переменную с уникальным именем.
+// Префикс $ отделяет внутренние имена от идентификаторов Go.
+func NewFreshSymbolicVariable(name string, exprType ExpressionType) *SymbolicVariable {
+	return NewSymbolicVariable(fmt.Sprintf("$%s.%d", name, internalVariableID.Add(1)), exprType)
 }
 
 // Type возвращает тип переменной
@@ -181,6 +190,16 @@ func (bo *BinaryOperation) String() string {
 // Accept реализует Visitor pattern
 func (bo *BinaryOperation) Accept(visitor ExpressionVisitorError) (interface{}, error) {
 	return visitor.VisitBinaryOperation(bo)
+}
+
+type StringConstant struct {
+	Value string
+}
+
+func (*StringConstant) Type() ExpressionType { return StringType }
+func (c *StringConstant) String() string     { return strconv.Quote(c.Value) }
+func (c *StringConstant) Accept(visitor ExpressionVisitorError) (interface{}, error) {
+	return visitor.VisitStringConstant(c)
 }
 
 type NegateOperation struct {
@@ -341,22 +360,43 @@ func (op LogicalOperator) String() string {
 	}
 }
 
+// Ref хранит адрес объекта и тип, на который указывает ссылка.
 type Ref struct {
-	// TODO: Выбрать и написать внутреннее представление символьной ссылки
-	ID       int64
+	// Addr может быть целочисленным выражением или прочитанным значением указателя.
+	Addr     SymbolicExpression
 	ExprType ExpressionType
 }
+
+var NullAddr = NewIntConstant(0)
 
 func (ref *Ref) Type() ExpressionType {
 	return PtrT{Elem: ref.ExprType}
 }
 
 func (ref *Ref) String() string {
-	return fmt.Sprintf("ref(%d)", ref.ID)
+	return fmt.Sprintf("ref(%s)", ref.Addr)
 }
 
 func (ref *Ref) Accept(visitor ExpressionVisitorError) (interface{}, error) {
 	return visitor.VisitRef(ref)
+}
+
+// ArrayConstant представляет массив с одним и тем же значением по всем индексам.
+type ArrayConstant struct {
+	Value SymbolicExpression
+	Index ExpressionType
+}
+
+func (ac *ArrayConstant) Type() ExpressionType {
+	return ArrayT{Elem: ac.Value.Type(), Index: ac.Index}
+}
+
+func (ac *ArrayConstant) String() string {
+	return fmt.Sprintf("constArray(%s)", ac.Value)
+}
+
+func (ac *ArrayConstant) Accept(visitor ExpressionVisitorError) (interface{}, error) {
+	return visitor.VisitArrayConstant(ac)
 }
 
 type ArrayAccess struct {
@@ -374,6 +414,25 @@ func (aa *ArrayAccess) String() string {
 
 func (aa *ArrayAccess) Accept(visitor ExpressionVisitorError) (interface{}, error) {
 	return visitor.VisitArrayAccess(aa)
+}
+
+// ArrayStore представляет массив, полученный из Array записью Value по индексу Index: store(Array, Index, Value)
+type ArrayStore struct {
+	Array SymbolicExpression
+	Index SymbolicExpression
+	Value SymbolicExpression
+}
+
+func (as *ArrayStore) Type() ExpressionType {
+	return as.Array.Type()
+}
+
+func (as *ArrayStore) String() string {
+	return fmt.Sprintf("store(%s, %s, %s)", as.Array, as.Index, as.Value)
+}
+
+func (as *ArrayStore) Accept(visitor ExpressionVisitorError) (interface{}, error) {
+	return visitor.VisitArrayStore(as)
 }
 
 type FunctionCall struct {

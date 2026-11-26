@@ -246,4 +246,3 @@ func TestFloat64Equality(t *testing.T) {
 		{"a!=b", bin(a, NE, b), "(not (fp.eq a b))"},
 	})
 }
-
